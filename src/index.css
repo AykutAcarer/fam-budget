@@ -19,3 +19,18 @@
     @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
   }
 }
+
+/* Donut dilimleri arasında 2px zemin rengi boşluk (kart zeminiyle aynı renk). */
+:root {
+  --chart-surface: #ffffff;
+}
+.dark {
+  --chart-surface: #0f172a;
+}
+.donut .recharts-sector {
+  stroke: var(--chart-surface);
+  stroke-width: 2px;
+}
+.recharts-wrapper *:focus {
+  outline: none;
+}

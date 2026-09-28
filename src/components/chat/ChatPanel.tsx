@@ -198,7 +198,8 @@ export function ChatPanel({ chat, colors }: { chat: Chat; colors: ReadonlyMap<st
               </span>
             </div>
           )}
-          <div ref={endRef} />
+          {/* Sabit giriş kutusu + tab bar son mesajı örtmesin diye kaydırma payı */}
+          <div ref={endRef} className="scroll-mb-40" />
         </div>
       </Card>
 

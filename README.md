@@ -5,13 +5,12 @@ Harcamalar serbest Türkçe metinle bir sohbet kutusundan girilir; para matemati
 
 Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_system_prompt.md`](app_system_prompt.md) · Örnek içe aktarma verisi (sentetik): [`ornek_veri.json`](ornek_veri.json)
 
-**Yığın:** Vite + React + TypeScript · Tailwind CSS v4 · Supabase (Auth + Postgres + RLS + Edge Functions) · Claude API · react-router · dayjs
+**Yığın:** Vite + React + TypeScript · Tailwind CSS v4 · Supabase (Auth + Postgres + RLS + Edge Functions) · Claude API · Recharts · react-router · dayjs
 
 ## Durum
 
 - [x] **1. katman:** iskelet, Supabase auth (kayıt/giriş/çıkış), tablolar + RLS, boş dashboard, tema
-- [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk)
-- [ ] Dashboard grafikleri ve KPI'lar (Recharts)
+- [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
 - [ ] Döngü detay, sabit giderler, borçlar ekranları
 - [ ] Ayarlar: baz ay seçimi, kategori yönetimi
 - [ ] PWA
@@ -164,9 +163,11 @@ src/
   auth/AuthProvider.tsx       oturum bağlamı + Türkçe hata mesajları
   components/
     chat/                     ChatPanel (sohbet arayüzü), useChat (sohbet durumu)
+    dashboard/                kıyas kartı, KPI'lar, kategori donut'u + tablosu
     DataTransferCard.tsx      Ayarlar > içe/dışa aktarma
   lib/
     compare.ts                kıyas motoru (saf, testli)
+    budget.ts                 dashboard verisi → kıyas, KPI'lar, kategori dağılımı (saf, testli)
     chatFlow.ts               sohbet akışı: parse → onay → kaydet → kıyas → cevap (testli)
     chatText.ts               kodla üretilen özet + AI cevabı rakam doğrulaması
     fallbackParser.ts         kural tabanlı yedek parser
