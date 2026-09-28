@@ -309,3 +309,32 @@ describe('CORS', () => {
     expect((await handleRequest(request('POST'), noAuth)).status).toBe(401)
   })
 })
+
+describe('reply modu — tekrar bilgisi', () => {
+  const repeat = { category: 'kahvalti', gunSayisi: 5, pencereGun: 7, kategoriToplam: 18.4, hatirlat: true }
+  const body = (r: unknown) => ({
+    mode: 'reply',
+    message: '2,5 simit',
+    context: { today: TODAY, categories: CATEGORIES, comparison: null, saved: [], repeat: r },
+  })
+
+  it('geçerli repeat bağlamda gider; tekrar talimatı gönderilir', async () => {
+    const { call, sentBody } = setup(() => claudeResponse({ expenses: [], reply: 'ok', clarify: null }))
+    await call(body(repeat))
+    const content: string = sentBody().messages[0].content
+    expect(content).toContain('"repeat":{"category":"kahvalti","gunSayisi":5,"pencereGun":7,"kategoriToplam":18.4,"hatirlat":true}')
+    expect(content).toContain('context.repeat.hatirlat true ise')
+  })
+
+  it('bozuk repeat yok sayılır (null)', async () => {
+    const { call, sentBody } = setup(() => claudeResponse({ expenses: [], reply: 'ok', clarify: null }))
+    await call(body({ ...repeat, hatirlat: 'evet' }))
+    expect(sentBody().messages[0].content).toContain('"repeat":null')
+  })
+
+  it('parse modunda repeat bağlama eklenmez', async () => {
+    const { call, sentBody } = setup(() => claudeResponse({ expenses: [], reply: 'ok', clarify: null }))
+    await call({ mode: 'parse', message: 'x 1', context: { today: TODAY, categories: CATEGORIES, repeat } })
+    expect(sentBody().messages[0].content).not.toContain('"repeat"')
+  })
+})

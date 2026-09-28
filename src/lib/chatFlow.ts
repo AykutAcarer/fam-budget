@@ -10,11 +10,12 @@
  *     sade özet kullanılır.
  */
 import type { ChatContext, ChatResult } from '../../supabase/functions/chat-expense/handler'
-import { buildComparison, type BudgetData } from './budget'
+import { buildComparison, buildRepeat, type BudgetData } from './budget'
 import type { Comparison } from './compare'
 import { replyIsGrounded, summaryText, type SavedItem } from './chatText'
 import { fallbackParse } from './fallbackParser'
 import type { NewExpense } from './outbox'
+import type { RepeatInfo } from './repeat'
 
 export type ItemSource = 'ai' | 'fallback'
 
@@ -50,7 +51,13 @@ export interface FlowEnv {
 
 export interface FlowDeps {
   parseWithAI: (text: string, context: ChatContext) => Promise<ChatResult>
-  replyWithAI: (text: string, context: ChatContext, comparison: Comparison | null, saved: SavedItem[]) => Promise<string>
+  replyWithAI: (
+    text: string,
+    context: ChatContext,
+    comparison: Comparison | null,
+    saved: SavedItem[],
+    repeat: RepeatInfo | null,
+  ) => Promise<string>
   saveExpenses: (items: NewExpense[]) => Promise<{ queued: boolean }>
   /** Kayıttan sonra güncel veri (hata olursa null). */
   reload: () => Promise<BudgetData | null>
@@ -116,14 +123,16 @@ export async function saveAndRespond(
   const comparison = fresh
     ? buildComparison(fresh, env.today, { pending: deps.pendingOutbox(), category: items[0]?.category })
     : null
+  // Tekrar bilgisi ve hatırlatma kararı kodda; yapay zeka yalnız cümleyi yazar.
+  const repeat = fresh && items[0] ? buildRepeat(fresh, env.today, items[0].category, deps.pendingOutbox()) : null
 
   const saved: SavedItem[] = items.map(({ amount, category, date, description }) => ({ amount, category, date, description }))
   let reply: string | null = null
   if (source === 'ai' && !queued) {
     try {
-      const candidate = await deps.replyWithAI(text, env.context, comparison, saved)
+      const candidate = await deps.replyWithAI(text, env.context, comparison, saved, repeat)
       // Yapay zeka matematik yapmaz: verilmeyen bir rakam yazdıysa cevabı kullanma.
-      if (replyIsGrounded(candidate, saved, comparison)) reply = candidate
+      if (replyIsGrounded(candidate, saved, comparison, repeat)) reply = candidate
     } catch {
       // Motive edici cümle yazılamadı; sade özet yeterli.
     }

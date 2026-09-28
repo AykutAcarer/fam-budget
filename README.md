@@ -82,8 +82,9 @@ npx supabase functions deploy chat-expense --no-verify-jwt
 `--no-verify-jwt`: kimlik doğrulamayı fonksiyonun kendisi yapar (`auth.getClaims` ile JWT imzası doğrulanır, yalnızca
 `authenticated` rolü kabul edilir; anon key ile çağrı 401 alır). Bu yöntem yeni asimetrik JWT anahtarlarıyla da çalışır.
 
-`app_system_prompt.md` değişirse: `npm run sync:prompt`, sonra yeniden deploy. (Bir test, üretilen dosyanın md ile aynı
-olduğunu kontrol eder.)
+**`app_system_prompt.md` değişirse fonksiyonu yeniden deploy et** — Edge Function bu metni system mesajı olarak kullanır;
+değişiklik ancak deploy'dan sonra canlıya geçer: `npm run sync:prompt` → `npx supabase functions deploy chat-expense --no-verify-jwt`.
+(Bir test, üretilen `system_prompt.ts` dosyasının md ile aynı olduğunu kontrol eder.)
 
 **Yerelde test:**
 
@@ -171,6 +172,11 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 - **Harcama kaybolmaz:** Edge Function'a ulaşılamazsa kural tabanlı parser devreye girer; veritabanına ulaşılamazsa kalem
   cihazda kuyruğa alınır ve bağlantı gelince (istemcide üretilmiş id ile, kopya oluşmadan) gönderilir.
 - Her cevaptaki **Geri al** kaydı siler.
+- **Tekrar hatırlatması:** kaydedilen kategoride son 7 günde (bugün dahil, döngü içinde) kaç farklı günde harcama
+  yapıldığını ve kategorinin döngü toplamını KOD hesaplar ([`repeat.ts`](src/lib/repeat.ts)); hatırlatma kararını da kod
+  verir: yalnızca kısılabilir kategoride ve ≥ 4 günde `hatirlat: true`. Bu bilgi cevap çağrısına `context.repeat` olarak
+  gider; yapay zeka yalnızca verilen sayılarla tek cümlelik nazik bir hatırlatma yazar (rakam doğrulaması bu sayıları da
+  kapsar). Yedek parser yolunda hatırlatma yoktur.
 
 ## Veritabanı
 

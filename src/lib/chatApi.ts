@@ -6,6 +6,7 @@ import type {
   ChatContext,
   ChatResult,
   ComparisonPayload,
+  RepeatPayload,
   SavedExpense,
 } from '../../supabase/functions/chat-expense/handler'
 import type { Comparison } from './compare'
@@ -47,11 +48,12 @@ export async function replyWithAI(
   context: ChatContext,
   comparison: Comparison | null,
   saved: SavedExpense[],
+  repeat: RepeatPayload | null = null,
 ): Promise<string> {
   const result = await invokeChat({
     mode: 'reply',
     message,
-    context: { ...context, comparison: toComparisonPayload(comparison), saved },
+    context: { ...context, comparison: toComparisonPayload(comparison), saved, repeat },
   })
   if (!result.reply.trim()) throw new Error('Boş cevap')
   return result.reply.trim()

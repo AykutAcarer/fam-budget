@@ -8,6 +8,7 @@
 import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
 import type { Comparison } from './compare'
+import type { RepeatInfo } from './repeat'
 import { formatEur } from './format'
 
 export interface SavedItem {
@@ -68,10 +69,17 @@ export function numbersIn(text: string): number[] {
 /**
  * Yapay zeka cevabındaki her sayı izin verilen rakamlardan biri mi?
  * İzinli: kaydedilen tutarlar, kıyas rakamları (farkın mutlak değeri dahil),
- * döngü günü ve 0–10 arası küçük tam sayılar ("2 kez" gibi).
+ * döngü günü, tekrar bilgisi (gün sayısı, pencere, kategori toplamı) ve 0–10
+ * arası küçük tam sayılar ("2 kez" gibi).
  */
-export function replyIsGrounded(reply: string, items: readonly SavedItem[], comparison: Comparison | null): boolean {
+export function replyIsGrounded(
+  reply: string,
+  items: readonly SavedItem[],
+  comparison: Comparison | null,
+  repeat: RepeatInfo | null = null,
+): boolean {
   const allowed: number[] = items.map((i) => i.amount)
+  if (repeat) allowed.push(repeat.gunSayisi, repeat.pencereGun, repeat.kategoriToplam)
   if (comparison) {
     allowed.push(comparison.cycleDay, comparison.dortluBuAy, comparison.dortluBazAy, comparison.fark, Math.abs(comparison.fark))
     if (comparison.kategori) allowed.push(comparison.kategori.buAy, comparison.kategori.bazAyTumAy)

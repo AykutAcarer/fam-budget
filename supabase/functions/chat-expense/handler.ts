@@ -45,6 +45,15 @@ export interface ComparisonPayload {
   kategoriBazAyTumAy: number | null
 }
 
+/** Kodla hesaplanmış tekrar bilgisi; hatırlatma kararını (hatirlat) da kod verir. */
+export interface RepeatPayload {
+  category: string
+  gunSayisi: number
+  pencereGun: number
+  kategoriToplam: number
+  hatirlat: boolean
+}
+
 export interface SavedExpense {
   amount: number
   category: string
@@ -60,6 +69,8 @@ export interface ChatContext {
   comparison?: ComparisonPayload | null
   /** Yalnızca reply modunda: az önce kaydedilen kalemler. */
   saved?: SavedExpense[]
+  /** Yalnızca reply modunda: tekrar eden harcama bilgisi (yoksa null). */
+  repeat?: RepeatPayload | null
 }
 
 export interface ChatRequest {
@@ -195,6 +206,11 @@ export function parseChatRequest(body: unknown): ChatRequest | string {
         kategoriBazAyTumAy: isNum(c.kategoriBazAyTumAy) ? c.kategoriBazAyTumAy : null,
       }
     }
+    const r = context.repeat
+    ctx.repeat =
+      isObj(r) && typeof r.category === 'string' && isNum(r.gunSayisi) && isNum(r.pencereGun) && isNum(r.kategoriToplam) && typeof r.hatirlat === 'boolean'
+        ? { category: r.category, gunSayisi: r.gunSayisi, pencereGun: r.pencereGun, kategoriToplam: r.kategoriToplam, hatirlat: r.hatirlat }
+        : null
     ctx.saved = Array.isArray(context.saved)
       ? context.saved.filter(isObj).slice(0, 20).map((s) => ({
           amount: isNum(s.amount) ? s.amount : 0,
@@ -264,6 +280,8 @@ export function buildUserContent(req: ChatRequest): string {
           'Harcamalar zaten kaydedildi (context.saved); expenses alanını boş dizi, clarify alanını null bırak.',
           'context.comparison içindeki rakamları DEĞİŞTİRMEDEN kullan; kendin hesap yapma.',
           'context.comparison null ise baz ay seçilmemiştir: kıyas yapmadan kısa bir onay yaz.',
+          'context.repeat.hatirlat true ise cevabın sonuna tek cümlelik nazik, suçlamayan bir tekrar hatırlatması ekle;',
+          'false ya da repeat yoksa tekrar hatırlatması YAPMA. Yalnızca verilen sayıları (gunSayisi, pencereGun, kategoriToplam) kullan.',
         ]
   return [
     ...task,

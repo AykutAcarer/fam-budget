@@ -180,3 +180,57 @@ describe('saveAndRespond', () => {
     expect(deps.replyWithAI.mock.calls[0][2]).toBeNull()
   })
 })
+
+describe('saveAndRespond — tekrar hatırlatması', () => {
+  const kahvalti = (date: string) => ({ ...expense('a', date, 'kahvalti', 3), id: `k-${date}` })
+  const withTypes = (variable: VariableExpenseRow[]): BudgetData => ({
+    ...budget(variable),
+    categories: [
+      { id: '1', user_id: 'u', key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', sort_order: 4, created_at: '' },
+      { id: '2', user_id: 'u', key: 'mutfak', label: 'Mutfak', type: 'zorunlu', color: '#22A06B', sort_order: 1, created_at: '' },
+    ],
+  })
+  // Bugün 18 Eyl (döngünün 4. günü): 15, 16, 17 Eyl'deki kahvaltılar + bugün kaydedilen → 4 farklı gün.
+  const TODAY4 = '2026-09-18'
+  const env4 = (data: BudgetData): FlowEnv => ({ today: TODAY4, context, labels, data })
+
+  it('kısılabilir kategoride 4. gün → hatirlat=true, sayılar yapay zekaya gider ve cevapta kullanılabilir', async () => {
+    const existing = ['2026-09-15', '2026-09-16', '2026-09-17'].map(kahvalti)
+    const saved: NewExpense = { id: 'new', amount: 2.5, category: 'kahvalti', date: TODAY4, description: 'simit' }
+    const deps = makeDeps({
+      reload: vi.fn(async () => withTypes([...existing, { ...saved, user_id: 'u', cycle_id: 'a', created_at: '' }])),
+      replyWithAI: vi.fn(async () => 'Kahvaltı 2,50 € kaydettim. Bu hafta 4. gün kahvaltı dışarıda, toplam 11,50 € — evden getirmek dörtlüyü rahatlatır 🙂'),
+    })
+    const reply = await saveAndRespond('2,5 simit', [saved], 'ai', false, env4(withTypes(existing)), deps)
+    const repeat = deps.replyWithAI.mock.calls[0][4]
+    expect(repeat).toEqual({ category: 'kahvalti', gunSayisi: 4, pencereGun: 7, kategoriToplam: 11.5, hatirlat: true })
+    expect(reply.author).toBe('ai') // 4 ve 11,50 verilen sayılar → kabul
+  })
+
+  it('3. gün → hatirlat=false', async () => {
+    const existing = ['2026-09-16', '2026-09-17'].map(kahvalti)
+    const saved: NewExpense = { id: 'new', amount: 2.5, category: 'kahvalti', date: TODAY4, description: 'simit' }
+    const deps = makeDeps({ reload: vi.fn(async () => withTypes([...existing, { ...saved, user_id: 'u', cycle_id: 'a', created_at: '' }])) })
+    await saveAndRespond('2,5 simit', [saved], 'ai', false, env4(withTypes(existing)), deps)
+    expect(deps.replyWithAI.mock.calls[0][4]).toMatchObject({ gunSayisi: 3, hatirlat: false })
+  })
+
+  it('zorunlu kategoride her gün olsa da hatirlat=false', async () => {
+    const existing = ['2026-09-15', '2026-09-16', '2026-09-17'].map((d) => ({ ...expense('a', d, 'mutfak', 20), id: `m-${d}` }))
+    const saved: NewExpense = { id: 'new', amount: 20, category: 'mutfak', date: TODAY4, description: 'market' }
+    const deps = makeDeps({ reload: vi.fn(async () => withTypes([...existing, { ...saved, user_id: 'u', cycle_id: 'a', created_at: '' }])) })
+    await saveAndRespond('20 market', [saved], 'ai', false, env4(withTypes(existing)), deps)
+    expect(deps.replyWithAI.mock.calls[0][4]).toMatchObject({ gunSayisi: 4, hatirlat: false })
+  })
+
+  it('yapay zeka tekrar cümlesinde uydurma toplam yazarsa kodla yazılmış özet gösterilir', async () => {
+    const existing = ['2026-09-15', '2026-09-16', '2026-09-17'].map(kahvalti)
+    const saved: NewExpense = { id: 'new', amount: 2.5, category: 'kahvalti', date: TODAY4, description: 'simit' }
+    const deps = makeDeps({
+      reload: vi.fn(async () => withTypes([...existing, { ...saved, user_id: 'u', cycle_id: 'a', created_at: '' }])),
+      replyWithAI: vi.fn(async () => 'Kaydettim. Bu hafta kahvaltıya 40,00 € gitti.'),
+    })
+    const reply = await saveAndRespond('2,5 simit', [saved], 'ai', false, env4(withTypes(existing)), deps)
+    expect(reply.author).toBe('kod')
+  })
+})

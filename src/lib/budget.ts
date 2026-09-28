@@ -5,6 +5,7 @@
 import { createColorLookup } from './categoryColors'
 import { compareToBaseline, type Comparison, type ExpenseLike } from './compare'
 import { fixedTotals, type FixedTotals } from './fixed'
+import { repeatInfo, type RepeatInfo } from './repeat'
 import { fromCents, sumMoney, toCents } from './money'
 import type { CycleWindow } from './cycle'
 import type { CategoryRow, CycleRow, FixedExpenseRow, IncomeRow, VariableExpenseRow } from './database.types'
@@ -45,6 +46,21 @@ export function buildComparison(
     baseline: { start: baseline.cycle.start_date, end: baseline.cycle.end_date, expenses: baseline.variable },
     today,
     category: opts.category,
+  })
+}
+
+/** Az önce kaydedilen kategorinin tekrar bilgisi (aktif döngü + cihazda bekleyenler). */
+export function buildRepeat(
+  data: BudgetData,
+  today: string,
+  category: string,
+  pending: readonly ExpenseLike[] = [],
+): RepeatInfo {
+  return repeatInfo({
+    category,
+    categoryType: data.categories.find((c) => c.key === category)?.type,
+    today,
+    cycle: { start: data.active.window.start, end: data.active.window.end, expenses: activeExpenses(data, pending) },
   })
 }
 

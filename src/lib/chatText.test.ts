@@ -65,3 +65,12 @@ describe('replyIsGrounded', () => {
     expect(replyIsGrounded('8,25 € kaydettim, baz ayın 12,40 € altındasın', [item], null)).toBe(false)
   })
 })
+
+describe('replyIsGrounded — tekrar bilgisi', () => {
+  const repeat = { category: 'kahvalti', gunSayisi: 5, pencereGun: 7, kategoriToplam: 18.4, hatirlat: true }
+  it('verilen tekrar toplamı kabul, uydurma toplam red', () => {
+    expect(replyIsGrounded('Bu hafta 5. gün kahvaltı dışarıda, toplam 18,40 €.', [item], null, repeat)).toBe(true)
+    expect(replyIsGrounded('Bu hafta kahvaltıya 25,00 € gitti.', [item], null, repeat)).toBe(false)
+    expect(replyIsGrounded('toplam 18,40 €', [item], null)).toBe(false)
+  })
+})
