@@ -6,6 +6,7 @@ import { Spinner } from './components/ui'
 import { supabaseConfigError } from './lib/supabase'
 import { AuthPage } from './pages/AuthPage'
 import { Dashboard } from './pages/Dashboard'
+import { FixedPage } from './pages/FixedPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { SettingsPage } from './pages/SettingsPage'
 
@@ -40,7 +41,7 @@ export default function App() {
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
         <Route path="dongu" element={<PlaceholderPage title="Döngü Detay" />} />
-        <Route path="sabit" element={<PlaceholderPage title="Sabit Giderler" />} />
+        <Route path="sabit" element={<FixedPage />} />
         <Route path="borclar" element={<PlaceholderPage title="Borçlar" />} />
         <Route path="ayarlar" element={<SettingsPage />} />
       </Route>

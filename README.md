@@ -11,7 +11,8 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 
 - [x] **1. katman:** iskelet, Supabase auth (kayıt/giriş/çıkış), tablolar + RLS, boş dashboard, tema
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
-- [ ] Döngü detay, sabit giderler, borçlar ekranları
+- [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
+- [ ] Döngü detay, borçlar ekranları
 - [ ] Ayarlar: baz ay seçimi, kategori yönetimi
 - [ ] PWA
 
@@ -21,8 +22,15 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 
 1. [supabase.com](https://supabase.com) üzerinde bir proje oluştur.
 2. Şemayı kur — `supabase/migrations/` altındaki dosyaları **sırayla**:
-   - **SQL Editor:** her dosyanın içeriğini yapıştırıp çalıştır
-     (`20260928000000_init.sql`, sonra `20260929000000_import_data.sql`).
+   - **SQL Editor:** her dosyanın içeriğini bu sırayla yapıştırıp çalıştır:
+
+     | Dosya | Ne yapar |
+     |---|---|
+     | `20260928000000_init.sql` | Tablolar, RLS, varsayılan kategoriler |
+     | `20260929000000_import_data.sql` | JSON içe aktarma fonksiyonu |
+     | `20260930000000_accessible_category_colors.sql` | Erişilebilir kategori renkleri + eski pastel renkleri taşıma |
+     | `20261001000000_fixed_expense_installments.sql` | Sabit giderlere `installments_left` (kalan taksit) + içe aktarmanın bunu taşıması |
+
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
    (geliştirirken *Confirm email* kapatılabilir). *Authentication > URL Configuration > Site URL* alanına uygulamanın adresini yaz
@@ -130,7 +138,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 |---|---|
 | `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir (bkz. *Kategori renkleri*). |
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
-| `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. |
+| `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.installments_left`: kalan taksit (taksit değilse NULL). |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
 
 | RPC | Açıklama |
@@ -162,6 +170,22 @@ Palet açık (#ffffff) ve koyu (#0f172a) zeminde ≥ 3:1 kontrastlıdır; donut'
 ΔE ≥ 8, normal görüşte ΔE ≥ 15 ayrışır (`src/lib/categoryColors.test.ts`). Renk değiştirmek için: tek kaynağı güncelle,
 yeni seed + eski renkleri taşıyan bir migration ekle (örnek: `20260930000000_accessible_category_colors.sql`).
 
+## Sabit giderler / ödeme takvimi
+
+*Sabit* sekmesi aktif döngünün sabit giderlerini ödeme gününe göre listeler. Toplamlar (toplam / ödenen / kalan) ve
+durumlar [`src/lib/fixed.ts`](src/lib/fixed.ts)'ten gelir; dashboard'daki sabit gider KPI'ı da aynı fonksiyonu kullanır.
+
+| Durum | Kural (ödenmemişse) |
+|---|---|
+| Gecikti | tarih < bugün |
+| Bugün | tarih = bugün |
+| Yaklaşıyor | bugün < tarih ≤ bugün + 3 gün |
+| İleri | tarih > bugün + 3 gün |
+| Ödendi | `paid = true` |
+
+Gün girildiğinde döngü içindeki tarihe yerleşir (15 Eyl – 14 Eki döngüsünde 22 → 22 Eyl, 7 → 7 Eki). Yaklaşan uyarısı
+şimdilik yalnızca uygulama içi şerittir; telefon bildirimi PWA katmanında gelecek. Kalan taksit sayısı elle düzenlenir.
+
 ## Döngü mantığı
 
 Döngü takvim ayı değildir: her ayın **15'inde** başlar, ertesi ayın **14'ünde** biter. Döngü günü 1 = 15'i.
@@ -185,6 +209,7 @@ src/
     fallbackParser.ts         kural tabanlı yedek parser
     expensesApi.ts, outbox.ts harcama kaydı + çevrimdışı kuyruk
     transfer.ts               içe aktarma doğrulama / dışa aktarma (saf)
+    fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...
 supabase/

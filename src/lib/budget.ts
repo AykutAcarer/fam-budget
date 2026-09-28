@@ -4,6 +4,7 @@
  */
 import { createColorLookup } from './categoryColors'
 import { compareToBaseline, type Comparison, type ExpenseLike } from './compare'
+import { fixedTotals, type FixedTotals } from './fixed'
 import { fromCents, sumMoney, toCents } from './money'
 import type { CycleWindow } from './cycle'
 import type { CategoryRow, CycleRow, FixedExpenseRow, IncomeRow, VariableExpenseRow } from './database.types'
@@ -60,7 +61,7 @@ export interface CategorySlice {
 
 export interface CycleSummary {
   income: { total: number; received: number }
-  fixed: { total: number; paid: number; remaining: number }
+  fixed: FixedTotals
   /** Aktif döngünün tüm değişken harcamaları (kredi kartı ödemesi dahil). */
   variable: number
   /** Bu döngüdeki kredi kartı ödemeleri (değişken harcamanın içinde). */
@@ -91,14 +92,12 @@ export function cycleSummary(data: BudgetData, pending: readonly ExpenseLike[] =
     }))
     .sort((a, b) => b.amount - a.amount || (meta.get(a.key)?.sort_order ?? 0) - (meta.get(b.key)?.sort_order ?? 0))
 
-  const fixedPaid = sumMoney(fixed.filter((f) => f.paid).map((f) => f.amount))
-  const fixedTotal = sumMoney(fixed.map((f) => f.amount))
   return {
     income: {
       total: sumMoney(income.map((i) => i.amount)),
       received: sumMoney(income.filter((i) => i.received).map((i) => i.amount)),
     },
-    fixed: { total: fixedTotal, paid: fixedPaid, remaining: fromCents(toCents(fixedTotal) - toCents(fixedPaid)) },
+    fixed: fixedTotals(fixed),
     variable: fromCents(totalCents),
     creditCard: fromCents(cents.get(CREDIT_CARD_KEY) ?? 0),
     byCategory,

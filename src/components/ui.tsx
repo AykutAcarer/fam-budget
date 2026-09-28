@@ -32,3 +32,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: Reac
     </header>
   )
 }
+
+/** Form giriş alanı stili (açık + koyu tema). */
+export const inputClass =
+  'mt-1 block w-full rounded-xl border-0 bg-slate-100 px-4 py-3 text-base text-slate-900 ring-1 ring-transparent placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-900'

@@ -118,7 +118,7 @@ describe('buildExport', () => {
       for (const x of [...c.income].reverse())
         rows.income.push({ ...x, id: id(), user_id: userId, cycle_id: cycleId, note: x.note ?? null, created_at: '' })
       for (const x of c.fixed)
-        rows.fixed.push({ ...x, id: id(), user_id: userId, cycle_id: cycleId, source: x.source ?? null, note: x.note ?? null, created_at: '' })
+        rows.fixed.push({ ...x, id: id(), user_id: userId, cycle_id: cycleId, source: x.source ?? null, note: x.note ?? null, installments_left: x.installmentsLeft ?? null, created_at: '' })
       for (const x of c.variable) rows.variable.push({ ...x, id: id(), user_id: userId, cycle_id: cycleId, created_at: '' })
     }
 

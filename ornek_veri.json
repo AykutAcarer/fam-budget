@@ -157,7 +157,8 @@
           "item": "Beyaz eşya taksiti",
           "amount": 39.99,
           "note": "Her ayın son günü",
-          "paid": true
+          "paid": true,
+          "installmentsLeft": 7
         },
         {
           "date": "2026-09-01",
@@ -570,7 +571,8 @@
           "item": "Beyaz eşya taksiti",
           "amount": 39.99,
           "note": "Her ayın son günü",
-          "paid": false
+          "paid": false,
+          "installmentsLeft": 6
         },
         {
           "date": "2026-10-01",

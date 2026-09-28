@@ -232,6 +232,36 @@ describe('import_data (ornek_veri.json)', () => {
     })
   })
 
+  it('kalan taksit sayısı içe aktarılır; negatif değer reddedilir', async () => {
+    await asUser(USER_C, async () => {
+      const res = await db.query<{ date: string; installments_left: number | null }>(
+        `select to_char(date, 'YYYY-MM-DD') as date, installments_left from public.fixed_expenses
+          where item = 'Beyaz eşya taksiti' order by date`,
+      )
+      expect(res.rows).toEqual([
+        { date: '2026-08-31', installments_left: 7 },
+        { date: '2026-09-30', installments_left: 6 },
+      ])
+      const nulls = await db.query<{ n: number }>(`select count(*)::int as n from public.fixed_expenses where installments_left is null`)
+      expect(nulls.rows[0].n).toBe(expected.fixed - 2)
+      await expect(
+        db.query(`update public.fixed_expenses set installments_left = -1 where item = 'Beyaz eşya taksiti'`),
+      ).rejects.toThrow(/check constraint/)
+    })
+  })
+
+  it('başka kullanıcı sabit gideri ödendi işaretleyemez', async () => {
+    // 'Beyaz eşya taksiti' yalnızca USER_C'de var.
+    const res = await asUser(USER_A, () =>
+      db.query(`update public.fixed_expenses set paid = true, installments_left = 0 where item = 'Beyaz eşya taksiti'`),
+    )
+    expect(res.affectedRows).toBe(0)
+    const still = await asUser(USER_C, () =>
+      db.query<{ n: number }>(`select count(*)::int as n from public.fixed_expenses where item = 'Beyaz eşya taksiti' and installments_left > 0`),
+    )
+    expect(still.rows[0].n).toBe(2)
+  })
+
   it('hata olursa hiçbir şey yazılmaz (atomik)', async () => {
     const broken = structuredClone(data)
     broken.cycles[0].id = '2027-01'

@@ -45,6 +45,8 @@ export interface FileFixed {
   paid: boolean
   source?: string | null
   note?: string | null
+  /** Kalan taksit sayısı (isteğe bağlı; eski dosyalarda yok). */
+  installmentsLeft?: number | null
 }
 
 export interface FileVariable {
@@ -127,6 +129,14 @@ class Reader {
     if (typeof n !== 'number' || !Number.isFinite(n)) return this.fail(`${path}.${key}`, 'sayı olmalı')
     if (n < 0) return this.fail(`${path}.${key}`, 'negatif olamaz')
     return roundMoney(n)
+  }
+
+  /** İsteğe bağlı negatif olmayan tam sayı; yoksa null. */
+  count(o: Obj, key: string, path: string): number | null {
+    const v = o[key]
+    if (v === undefined || v === null) return null
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) return this.fail(`${path}.${key}`, 'negatif olmayan tam sayı olmalı') ?? null
+    return v
   }
 
   bool(o: Obj, key: string, fallback = false): boolean {
@@ -240,6 +250,7 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
           paid: r.bool(x, 'paid'),
           source: r.text(x, 'source', q, { optional: true }) ?? null,
           note: r.text(x, 'note', q, { optional: true }) ?? null,
+          installmentsLeft: r.count(x, 'installmentsLeft', q),
         })
     })
 
@@ -336,6 +347,7 @@ export function buildExport(rows: ExportRows, generatedAt: string): BudgetFile {
           paid: x.paid,
           source: x.source,
           note: x.note,
+          installmentsLeft: x.installments_left,
         })),
         variable: perCycle(rows.variable, c.id).map((x) => ({
           date: x.date,

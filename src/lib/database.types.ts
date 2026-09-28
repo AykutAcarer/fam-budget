@@ -61,6 +61,8 @@ export type FixedExpenseRow = {
   paid: boolean
   source: string | null
   note: string | null
+  /** Kalan taksit sayısı; taksit değilse null. */
+  installments_left: number | null
   created_at: string
 }
 
@@ -107,7 +109,7 @@ export interface Database {
       fixed_expenses: Table<
         FixedExpenseRow,
         'cycle_id' | 'date' | 'item' | 'amount',
-        Generated | 'paid' | 'source' | 'note'
+        Generated | 'paid' | 'source' | 'note' | 'installments_left'
       >
       variable_expenses: Table<
         VariableExpenseRow,
