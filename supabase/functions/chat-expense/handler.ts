@@ -13,6 +13,8 @@
  * cevaptaki tool_use.input doğrudan kullanılır (serbest metin JSON ayrıştırma yok).
  */
 
+import { DEFAULT_CATEGORY_KEYS } from '../_shared/categories.ts'
+
 export const TOOL_NAME = 'harcama_kaydet'
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -20,10 +22,8 @@ const MAX_TOKENS = 500
 const UPSTREAM_TIMEOUT_MS = 20_000
 const MAX_MESSAGE_LENGTH = 500
 
-/** Bağlam kategori listesi gelmezse kullanılan varsayılan 10 kategori. */
-export const DEFAULT_CATEGORY_KEYS = [
-  'mutfak', 'yakit', 'mensemax', 'kahvalti', 'is', 'halisaha', 'sosyal', 'temizlik', 'hanim', 'kredi karti',
-] as const
+/** Bağlam kategori listesi gelmezse kullanılan varsayılan kategoriler (tek kaynak: _shared/categories.ts). */
+export { DEFAULT_CATEGORY_KEYS }
 
 // ---------------------------------------------------------------------------
 // Tipler (istemciyle paylaşılan sözleşme)

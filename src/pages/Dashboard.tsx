@@ -15,6 +15,7 @@ import { ComparisonCard } from '../components/dashboard/ComparisonCard'
 import { KpiGrid } from '../components/dashboard/KpiGrid'
 import { Card, Spinner } from '../components/ui'
 import { buildComparison, cycleSummary } from '../lib/budget'
+import { createColorLookup } from '../lib/categoryColors'
 import { cycleLabel, cycleLength, todayIso } from '../lib/cycle'
 import { clampedCycleDay } from '../lib/compare'
 import { useBudgetData } from '../lib/useBudgetData'
@@ -24,7 +25,7 @@ export function Dashboard() {
   const [today] = useState(todayIso)
   const { data, error, reload } = useBudgetData(today)
   const chat = useChat({ userId: session!.user.id, today, data, reload })
-  const colors = useMemo(() => new Map(data?.categories.map((c) => [c.key, c.color])), [data])
+  const colorOf = useMemo(() => createColorLookup(data?.categories), [data])
 
   const summary = useMemo(() => (data ? cycleSummary(data, chat.outbox) : null), [data, chat.outbox])
   const comparison = useMemo(
@@ -43,7 +44,7 @@ export function Dashboard() {
             Veriler yüklenemedi: {error}
           </p>
         </Card>
-        <ChatPanel chat={chat} colors={colors} />
+        <ChatPanel chat={chat} colorOf={colorOf} />
       </div>
     )
   }
@@ -100,7 +101,7 @@ export function Dashboard() {
 
       <CategoryCard slices={summary.byCategory} total={summary.variable} />
 
-      <ChatPanel chat={chat} colors={colors} />
+      <ChatPanel chat={chat} colorOf={colorOf} />
     </div>
   )
 }

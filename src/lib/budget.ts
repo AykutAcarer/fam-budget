@@ -2,6 +2,7 @@
  * Dashboard verisi ve ondan türetilen rakamlar — saf fonksiyonlar.
  * Tüm para hesapları kodla (compare.ts / money.ts) yapılır.
  */
+import { createColorLookup } from './categoryColors'
 import { compareToBaseline, type Comparison, type ExpenseLike } from './compare'
 import { fromCents, sumMoney, toCents } from './money'
 import type { CycleWindow } from './cycle'
@@ -68,8 +69,6 @@ export interface CycleSummary {
   byCategory: CategorySlice[]
 }
 
-const FALLBACK_COLOR = '#BFBFBF'
-
 /** Aktif döngünün KPI'ları ve kategori dağılımı (kodla, sent hassasiyetinde). */
 export function cycleSummary(data: BudgetData, pending: readonly ExpenseLike[] = []): CycleSummary {
   const { income, fixed } = data.active
@@ -80,12 +79,13 @@ export function cycleSummary(data: BudgetData, pending: readonly ExpenseLike[] =
   const totalCents = [...cents.values()].reduce((a, b) => a + b, 0)
 
   const meta = new Map(data.categories.map((c) => [c.key, c]))
+  const colorOf = createColorLookup(data.categories)
   const byCategory = [...cents.entries()]
     .filter(([, v]) => v > 0)
     .map(([key, v]) => ({
       key,
       label: meta.get(key)?.label ?? key,
-      color: meta.get(key)?.color ?? FALLBACK_COLOR,
+      color: colorOf(key),
       amount: fromCents(v),
       share: totalCents ? v / totalCents : 0,
     }))

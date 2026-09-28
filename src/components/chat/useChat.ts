@@ -3,7 +3,7 @@
  * Akışın kendisi src/lib/chatFlow.ts'te (React'ten bağımsız, testli).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DEFAULT_CATEGORY_KEYS } from '../../../supabase/functions/chat-expense/handler'
+import { DEFAULT_CATEGORIES } from '../../../supabase/functions/_shared/categories'
 import type { BudgetData } from '../../lib/budget'
 import { parseWithAI, replyWithAI } from '../../lib/chatApi'
 import { interpret, saveAndRespond, type FlowDeps, type FlowEnv, type ItemSource, type PendingConfirm } from '../../lib/chatFlow'
@@ -77,7 +77,7 @@ export function useChat(params: {
     () =>
       data?.categories.length
         ? data.categories.map((c) => ({ key: c.key, label: c.label }))
-        : DEFAULT_CATEGORY_KEYS.map((key) => ({ key, label: key })),
+        : DEFAULT_CATEGORIES.map(({ key, label }) => ({ key, label })),
     [data],
   )
   const labels = useMemo(() => new Map(categories.map((c) => [c.key, c.label])), [categories])

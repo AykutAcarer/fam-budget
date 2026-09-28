@@ -13,61 +13,61 @@
       "key": "mutfak",
       "label": "Mutfak / Market",
       "type": "zorunlu",
-      "color": "#C6EFCE"
+      "color": "#22A06B"
     },
     {
       "key": "yakit",
       "label": "Yakıt",
       "type": "zorunlu",
-      "color": "#FFD966"
+      "color": "#E47007"
     },
     {
       "key": "mensemax",
       "label": "MensaMax (okul yemeği)",
       "type": "zorunlu",
-      "color": "#FF99CC"
+      "color": "#C026D3"
     },
     {
       "key": "kahvalti",
       "label": "Kahvaltı",
       "type": "kisilabilir",
-      "color": "#FFF2CC"
+      "color": "#B78C11"
     },
     {
       "key": "is",
       "label": "İş / öğlen / atıştırmalık",
       "type": "kisilabilir",
-      "color": "#F4B183"
+      "color": "#E23B3B"
     },
     {
       "key": "halisaha",
       "label": "Halı saha",
       "type": "kisilabilir",
-      "color": "#9DC3E6"
+      "color": "#3E89DE"
     },
     {
       "key": "sosyal",
       "label": "Sosyal / diğer",
       "type": "kisilabilir",
-      "color": "#D9D2E9"
+      "color": "#7C4DFF"
     },
     {
       "key": "temizlik",
       "label": "Temizlik / Rossmann",
       "type": "yari",
-      "color": "#CC99FF"
+      "color": "#17A2B8"
     },
     {
       "key": "hanim",
       "label": "Hanıma verilen",
       "type": "yari",
-      "color": "#99E6E6"
+      "color": "#A1592B"
     },
     {
       "key": "kredi karti",
       "label": "Kredi kartı ödemesi",
       "type": "borc",
-      "color": "#BFBFBF"
+      "color": "#6B7280"
     }
   ],
   "debts": [

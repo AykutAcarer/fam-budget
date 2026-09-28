@@ -4,18 +4,17 @@
  */
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import type { CategorySlice } from '../../lib/budget'
+import { sortForDonut } from '../../lib/categoryColors'
 import { formatEur, formatShare } from '../../lib/format'
+import { CategoryBadge } from '../CategoryBadge'
 
 function SliceTooltip({ active, payload }: { active?: boolean; payload?: readonly { payload?: unknown }[] }) {
   const slice = active ? (payload?.[0]?.payload as CategorySlice | undefined) : undefined
   if (!slice) return null
   return (
     <div className="rounded-lg bg-white px-3 py-2 text-xs shadow-md ring-1 ring-slate-900/10 dark:bg-slate-800 dark:ring-white/10">
-      <p className="flex items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100">
-        <span className="size-2.5 rounded-full" style={{ backgroundColor: slice.color }} />
-        {slice.label}
-      </p>
-      <p className="mt-0.5 text-slate-600 tabular-nums dark:text-slate-300">
+      <CategoryBadge color={slice.color}>{slice.label}</CategoryBadge>
+      <p className="mt-1 text-slate-600 tabular-nums dark:text-slate-300">
         {formatEur(slice.amount)} · {formatShare(slice.share)}
       </p>
     </div>
@@ -23,12 +22,14 @@ function SliceTooltip({ active, payload }: { active?: boolean; payload?: readonl
 }
 
 export default function CategoryDonut({ slices, total }: { slices: CategorySlice[]; total: number }) {
+  // Sabit halka sırası: komşu dilim renkleri doğrulanmış çiftlerdir (bkz. _shared/categories.ts).
+  const ordered = sortForDonut(slices)
   return (
     <div className="relative mx-auto aspect-square w-full max-w-[220px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie
-            data={slices}
+            data={ordered}
             dataKey="amount"
             nameKey="label"
             innerRadius="62%"
@@ -38,7 +39,7 @@ export default function CategoryDonut({ slices, total }: { slices: CategorySlice
             isAnimationActive={false}
             className="donut"
           >
-            {slices.map((s) => (
+            {ordered.map((s) => (
               <Cell key={s.key} fill={s.color} />
             ))}
           </Pie>

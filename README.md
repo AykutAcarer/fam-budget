@@ -128,7 +128,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 
 | Tablo | Açıklama |
 |---|---|
-| `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir. |
+| `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir (bkz. *Kategori renkleri*). |
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
 | `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
@@ -149,6 +149,18 @@ baz ay kuralı ve `ornek_veri.json`'ın içe aktarılması (idempotentlik, atomi
 
 **Kişisel veri:** gerçek bütçe verisi repoya girmez (`butce_verisi.json` `.gitignore`'da). Testler ve örnekler yalnızca
 tamamen sentetik `ornek_veri.json`'ı kullanır.
+
+## Kategori renkleri
+
+Tek kaynak: [`supabase/functions/_shared/categories.ts`](supabase/functions/_shared/categories.ts) — varsayılan
+kategoriler, renkler ve donut dilim sırası. İstemci (donut, tablo noktaları, rozetler) ve Edge Function buradan okur;
+veritabanı seed'i (`seed_default_categories`) bunun aynasıdır ve `supabase/tests/category-colors.test.ts` ikisinin
+aynı olduğunu doğrular. Renkler [`src/lib/categoryColors.ts`](src/lib/categoryColors.ts) üzerinden kullanılır; rozet metni
+rengin koyu (açık tema) / açık (koyu tema) tonundan hesaplanır ve kendi zemininde ≥ 4.5:1 kontrast sağlar.
+
+Palet açık (#ffffff) ve koyu (#0f172a) zeminde ≥ 3:1 kontrastlıdır; donut'ta komşu dilimler renk körlüğü simülasyonunda
+ΔE ≥ 8, normal görüşte ΔE ≥ 15 ayrışır (`src/lib/categoryColors.test.ts`). Renk değiştirmek için: tek kaynağı güncelle,
+yeni seed + eski renkleri taşıyan bir migration ekle (örnek: `20260930000000_accessible_category_colors.sql`).
 
 ## Döngü mantığı
 

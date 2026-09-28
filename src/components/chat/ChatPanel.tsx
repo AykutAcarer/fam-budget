@@ -1,8 +1,10 @@
 /**
  * WhatsApp benzeri sohbet akışı + altta sabit giriş kutusu.
  */
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import type { ColorLookup } from '../../lib/categoryColors'
 import { formatEur } from '../../lib/format'
+import { BADGE_TONE_CLASSES, badgeStyle, CategoryBadge, CategoryDot } from '../CategoryBadge'
 import { SendIcon } from '../icons'
 import { Card, CardTitle } from '../ui'
 import type { ChatMessage, PendingConfirm, useChat } from './useChat'
@@ -11,25 +13,15 @@ type Chat = ReturnType<typeof useChat>
 
 const time = (at: number) => new Date(at).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 
-function CategoryDot({ color }: { color?: string }) {
-  return (
-    <span
-      className="inline-block size-2.5 shrink-0 rounded-full ring-1 ring-slate-900/15 dark:ring-white/20"
-      style={{ backgroundColor: color ?? '#D9D2E9' }}
-      aria-hidden="true"
-    />
-  )
-}
-
 function BotBubble({
   msg,
   labels,
-  colors,
+  colorOf,
   onUndo,
 }: {
   msg: Extract<ChatMessage, { role: 'bot' }>
   labels: ReadonlyMap<string, string>
-  colors: ReadonlyMap<string, string>
+  colorOf: ColorLookup
   onUndo: () => void
 }) {
   const tone =
@@ -44,8 +36,7 @@ function BotBubble({
           <ul className="mb-1.5 space-y-1">
             {msg.expenses.map((e) => (
               <li key={e.id} className={`flex items-center gap-2 ${e.undone ? 'line-through opacity-60' : ''}`}>
-                <CategoryDot color={colors.get(e.category)} />
-                <span className="font-medium">{labels.get(e.category) ?? e.category}</span>
+                <CategoryBadge color={colorOf(e.category)}>{labels.get(e.category) ?? e.category}</CategoryBadge>
                 <span className="ml-auto pl-2 font-semibold tabular-nums">{formatEur(e.amount)}</span>
               </li>
             ))}
@@ -73,13 +64,13 @@ function BotBubble({
 function ConfirmCard({
   pending,
   categories,
-  colors,
+  colorOf,
   onConfirm,
   onCancel,
 }: {
   pending: PendingConfirm
   categories: { key: string; label: string }[]
-  colors: ReadonlyMap<string, string>
+  colorOf: ColorLookup
   onConfirm: (choice: Record<string, string>) => void
   onCancel: () => void
 }) {
@@ -103,13 +94,12 @@ function ConfirmCard({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setChoice((s) => ({ ...s, [e.id]: c.key }))}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
-                    selected
-                      ? 'bg-slate-900 text-white ring-slate-900 dark:bg-white dark:text-slate-900 dark:ring-white'
-                      : 'bg-white text-slate-700 ring-slate-900/10 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200 dark:ring-white/10'
+                  style={{ ...badgeStyle(colorOf(c.key)), '--tw-ring-color': colorOf(c.key) } as CSSProperties}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-shadow ${BADGE_TONE_CLASSES} ${
+                    selected ? 'ring-2 ring-offset-1 ring-offset-amber-50 dark:ring-offset-slate-900' : ''
                   }`}
                 >
-                  <CategoryDot color={colors.get(c.key)} />
+                  {selected ? <span aria-hidden="true">✓</span> : <CategoryDot color={colorOf(c.key)} className="size-2" />}
                   {c.label}
                 </button>
               )
@@ -137,7 +127,7 @@ function ConfirmCard({
   )
 }
 
-export function ChatPanel({ chat, colors }: { chat: Chat; colors: ReadonlyMap<string, string> }) {
+export function ChatPanel({ chat, colorOf }: { chat: Chat; colorOf: ColorLookup }) {
   const [input, setInput] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
   const { messages, pending, busy, outbox, labels, categories } = chat
@@ -176,7 +166,7 @@ export function ChatPanel({ chat, colors }: { chat: Chat; colors: ReadonlyMap<st
                 </p>
               </div>
             ) : (
-              <BotBubble key={m.id} msg={m} labels={labels} colors={colors} onUndo={() => void chat.undo(m.id)} />
+              <BotBubble key={m.id} msg={m} labels={labels} colorOf={colorOf} onUndo={() => void chat.undo(m.id)} />
             ),
           )}
           {pending && (
@@ -184,7 +174,7 @@ export function ChatPanel({ chat, colors }: { chat: Chat; colors: ReadonlyMap<st
               key={pending.text}
               pending={pending}
               categories={categories}
-              colors={colors}
+              colorOf={colorOf}
               onConfirm={(c) => void chat.confirm(c)}
               onCancel={chat.cancel}
             />

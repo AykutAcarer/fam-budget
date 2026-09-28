@@ -2,6 +2,7 @@
 import { lazy, Suspense } from 'react'
 import type { CategorySlice } from '../../lib/budget'
 import { formatEur, formatShare } from '../../lib/format'
+import { CategoryDot } from '../CategoryBadge'
 import { Card, CardTitle } from '../ui'
 
 const CategoryDonut = lazy(() => import('./CategoryDonut'))
@@ -35,11 +36,7 @@ export function CategoryCard({ slices, total }: { slices: CategorySlice[]; total
                 <tr key={s.key} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
                   <th scope="row" className="py-1.5 pr-2 text-left font-normal">
                     <span className="flex items-center gap-2">
-                      <span
-                        className="size-2.5 shrink-0 rounded-full ring-1 ring-slate-900/15 dark:ring-white/20"
-                        style={{ backgroundColor: s.color }}
-                        aria-hidden="true"
-                      />
+                      <CategoryDot color={s.color} />
                       <span className="truncate">{s.label}</span>
                     </span>
                   </th>
