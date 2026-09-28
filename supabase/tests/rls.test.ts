@@ -9,10 +9,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { clampIsoDate } from '../../src/lib/date'
+import { normalizeImport } from '../../src/lib/transfer'
 
 const MIGRATIONS_DIR = join(import.meta.dirname, '..', 'migrations')
-const SEED_FILE = join(import.meta.dirname, '..', '..', 'butce_verisi.json')
+const SEED_FILE = join(import.meta.dirname, '..', '..', 'ornek_veri.json')
 
 const USER_A = '00000000-0000-0000-0000-00000000000a'
 const USER_B = '00000000-0000-0000-0000-00000000000b'
@@ -166,57 +166,86 @@ describe('baz ay', () => {
   })
 })
 
-describe('seed verisi (butce_verisi.json)', () => {
-  // Not: seed'de '2026-09-31' gibi geçersiz tarihler var; importer gibi clampIsoDate ile düzeltilir.
-  it('şema kısıtlarına uyar ve eksiksiz yazılabilir', async () => {
-    type SeedCycle = {
-      id: string; label: string; start: string; end: string; isBaseline: boolean
-      income: { date: string; source: string; amount: number; received: boolean; note?: string }[]
-      fixed: { date: string; item: string; amount: number; paid: boolean; source?: string; note?: string }[]
-      variable: { date: string; category: string; description: string; amount: number }[]
-    }
-    const seed = JSON.parse(readFileSync(SEED_FILE, 'utf8')) as {
-      debts: { name: string; balance: number; interest: string | null; hasInterest: boolean; dueDate: string | null; priority: number; note?: string }[]
-      cycles: SeedCycle[]
-    }
-    const userC = '00000000-0000-0000-0000-00000000000c'
-    await db.query(`insert into auth.users (id) values ($1)`, [userC])
+describe('import_data (ornek_veri.json)', () => {
+  const USER_C = '00000000-0000-0000-0000-00000000000c'
+  const { data } = normalizeImport(JSON.parse(readFileSync(SEED_FILE, 'utf8')))
+  const counts = () =>
+    db.query<Record<string, number>>(`
+      select (select count(*)::int from public.cycles) as cycles,
+             (select count(*)::int from public.income) as income,
+             (select count(*)::int from public.fixed_expenses) as fixed,
+             (select count(*)::int from public.variable_expenses) as variable,
+             (select count(*)::int from public.debts) as debts,
+             (select count(*)::int from public.categories) as categories`)
+  const expected = {
+    cycles: data.cycles.length,
+    income: data.cycles.reduce((s, c) => s + c.income.length, 0),
+    fixed: data.cycles.reduce((s, c) => s + c.fixed.length, 0),
+    variable: data.cycles.reduce((s, c) => s + c.variable.length, 0),
+    debts: data.debts.length,
+    categories: 10,
+  }
 
-    await asUser(userC, async () => {
-      for (const d of seed.debts) {
-        await db.query(
-          `insert into public.debts (name, balance, interest, has_interest, due_date, priority, note) values ($1,$2,$3,$4,$5,$6,$7)`,
-          [d.name, d.balance, d.interest, d.hasInterest, d.dueDate, d.priority, d.note ?? null],
-        )
-      }
-      for (const c of seed.cycles) {
-        const res = await db.query<{ id: string }>(
-          `insert into public.cycles (key, label, start_date, end_date, is_baseline) values ($1,$2,$3,$4,$5) returning id`,
-          [c.id, c.label, c.start, c.end, c.isBaseline],
-        )
-        const cycleId = res.rows[0].id
-        for (const i of c.income) {
-          await db.query(
-            `insert into public.income (cycle_id, date, source, amount, received, note) values ($1,$2,$3,$4,$5,$6)`,
-            [cycleId, clampIsoDate(i.date), i.source, i.amount, i.received, i.note ?? null],
-          )
-        }
-        for (const f of c.fixed) {
-          await db.query(
-            `insert into public.fixed_expenses (cycle_id, date, item, amount, paid, source, note) values ($1,$2,$3,$4,$5,$6,$7)`,
-            [cycleId, clampIsoDate(f.date), f.item, f.amount, f.paid, f.source ?? null, f.note ?? null],
-          )
-        }
-        for (const v of c.variable) {
-          await db.query(
-            `insert into public.variable_expenses (cycle_id, date, category, description, amount) values ($1,$2,$3,$4,$5)`,
-            [cycleId, clampIsoDate(v.date), v.category, v.description, v.amount],
-          )
-        }
-      }
+  beforeAll(async () => {
+    await db.query(`insert into auth.users (id) values ($1)`, [USER_C])
+  })
 
-      const counts = await db.query<{ n: number }>('select count(*)::int as n from public.variable_expenses')
-      expect(counts.rows[0].n).toBe(seed.cycles.reduce((s, c) => s + c.variable.length, 0))
+  it('tüm veriyi kullanıcının hesabına yazar', async () => {
+    await asUser(USER_C, async () => {
+      // Kullanıcının kendi kategori etiketi korunmalı.
+      await db.query(`update public.categories set label = 'Benim marketim' where key = 'mutfak'`)
+      const res = await db.query<{ s: Record<string, number> }>('select public.import_data($1) as s', [JSON.stringify(data)])
+      expect(res.rows[0].s).toEqual({ ...expected, categories: 0 })
+      expect((await counts()).rows[0]).toEqual(expected)
+
+      const baseline = await db.query<{ key: string }>('select key from public.cycles where is_baseline')
+      expect(baseline.rows.map((r) => r.key)).toEqual(['2026-08'])
+      const label = await db.query<{ label: string }>(`select label from public.categories where key = 'mutfak'`)
+      expect(label.rows[0].label).toBe('Benim marketim')
+      const clamped = await db.query(`select 1 from public.fixed_expenses where date = '2026-09-30'`)
+      expect(clamped.rows).toHaveLength(1)
     })
+  })
+
+  it('idempotent: tekrar içe aktarınca kopya oluşmaz', async () => {
+    await asUser(USER_C, async () => {
+      await db.query(`select public.import_data($1)`, [JSON.stringify(data)])
+      expect((await counts()).rows[0]).toEqual(expected)
+    })
+  })
+
+  it('aynı döngüdeki eski kayıtları dosyadakilerle değiştirir, baz ayı taşır', async () => {
+    const edited = structuredClone(data)
+    edited.cycles[1].variable = [{ date: '2026-09-16', category: 'halisaha', description: 'halısaha', amount: 8.25 }]
+    edited.cycles[0].isBaseline = false
+    edited.cycles[1].isBaseline = true
+    edited.debts[0].balance = 100
+    await asUser(USER_C, async () => {
+      await db.query(`select public.import_data($1)`, [JSON.stringify(edited)])
+      const c = (await counts()).rows[0]
+      expect(c.variable).toBe(data.cycles[0].variable.length + 1)
+      expect(c.debts).toBe(data.debts.length)
+      const baseline = await db.query<{ key: string }>('select key from public.cycles where is_baseline')
+      expect(baseline.rows.map((r) => r.key)).toEqual(['2026-09'])
+      const debt = await db.query<{ balance: string }>('select balance from public.debts where name = $1', [data.debts[0].name])
+      expect(debt.rows[0].balance).toBe('100.00')
+    })
+  })
+
+  it('hata olursa hiçbir şey yazılmaz (atomik)', async () => {
+    const broken = structuredClone(data)
+    broken.cycles[0].id = '2027-01'
+    broken.cycles[1].variable.push({ date: '2026-09-20', category: 'yok-boyle-kategori', description: '', amount: 1 })
+    await asUser(USER_C, async () => {
+      const before = (await counts()).rows[0]
+      await expect(db.query(`select public.import_data($1)`, [JSON.stringify(broken)])).rejects.toThrow(/foreign key/)
+      expect((await counts()).rows[0]).toEqual(before)
+    })
+  })
+
+  it('başka kullanıcı içe aktarılan veriyi göremez; anon çağıramaz', async () => {
+    const rows = await asUser(USER_A, () => db.query(`select 1 from public.cycles where key = '2026-08'`))
+    expect(rows.rows).toHaveLength(0)
+    await expect(asUser(null, () => db.query(`select public.import_data('{}')`))).rejects.toThrow(/permission denied/)
   })
 })

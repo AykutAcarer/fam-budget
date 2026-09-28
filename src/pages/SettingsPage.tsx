@@ -1,9 +1,10 @@
 /**
- * Ayarlar. Şimdilik: hesap bilgisi, tema seçimi, çıkış.
- * (İçe/dışa aktarma, baz ay, kategori yönetimi sonraki adımlarda.)
+ * Ayarlar: tema, veri içe/dışa aktarma, çıkış.
+ * (Baz ay seçimi ve kategori yönetimi sonraki adımlarda.)
  */
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { DataTransferCard } from '../components/DataTransferCard'
 import { Card, CardTitle, PageHeader } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { useTheme, type ThemePref } from '../lib/theme'
@@ -52,12 +53,7 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <Card>
-          <CardTitle>Veri</CardTitle>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            JSON içe/dışa aktarma, baz ay seçimi ve kategori yönetimi çok yakında burada.
-          </p>
-        </Card>
+        <DataTransferCard />
 
         <button
           type="button"

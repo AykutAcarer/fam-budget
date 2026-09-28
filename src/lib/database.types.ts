@@ -88,6 +88,16 @@ export type DebtRow = {
   created_at: string
 }
 
+/** import_data RPC'sinin döndürdüğü sayılar. */
+export type ImportSummary = {
+  categories: number
+  debts: number
+  cycles: number
+  income: number
+  fixed: number
+  variable: number
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -113,6 +123,8 @@ export interface Database {
     Views: { [_ in never]: never }
     Functions: {
       set_baseline_cycle: { Args: { p_cycle_id: string }; Returns: undefined }
+      /** Normalleştirilmiş içe aktarma dosyası (bkz. src/lib/transfer.ts) → eklenen/güncellenen sayılar. */
+      import_data: { Args: { p_data: unknown }; Returns: ImportSummary }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

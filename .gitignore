@@ -9,3 +9,6 @@ supabase/.temp
 supabase/.branches
 .DS_Store
 *.log
+
+# Gerçek kişisel bütçe verisi — repoya girmez (test/örnek için ornek_veri.json)
+butce_verisi.json
