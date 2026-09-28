@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { AppLayout } from './components/AppLayout'
 import { Spinner } from './components/ui'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import { supabaseConfigError } from './lib/supabase'
 import { AuthPage } from './pages/AuthPage'
 import { CyclePage } from './pages/CyclePage'
@@ -37,16 +38,19 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route path="/giris" element={<GuestOnly><AuthPage /></GuestOnly>} />
-      <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-        <Route index element={<Dashboard />} />
-        <Route path="dongu" element={<CyclePage />} />
-        <Route path="sabit" element={<FixedPage />} />
-        <Route path="borclar" element={<DebtsPage />} />
-        <Route path="ayarlar" element={<SettingsPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <UpdatePrompt />
+      <Routes>
+        <Route path="/giris" element={<GuestOnly><AuthPage /></GuestOnly>} />
+        <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
+          <Route index element={<Dashboard />} />
+          <Route path="dongu" element={<CyclePage />} />
+          <Route path="sabit" element={<FixedPage />} />
+          <Route path="borclar" element={<DebtsPage />} />
+          <Route path="ayarlar" element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }

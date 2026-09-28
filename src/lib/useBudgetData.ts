@@ -81,7 +81,9 @@ export function useBudgetData(today: string): BudgetState {
       }
       return d
     } catch (e) {
-      if (req === latest.current) setError(e instanceof Error ? e.message : 'Veriler yüklenemedi.')
+      if (req === latest.current)
+        // Supabase hataları Error örneği değil, { message } nesnesidir.
+        setError(e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : String(e))
       return null
     }
   }, [today])

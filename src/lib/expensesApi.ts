@@ -9,7 +9,7 @@ import { supabase } from './supabase'
 
 /** Ağ/bağlantı kaynaklı bir hata mı (kuyruğa alınmalı), yoksa veri hatası mı? */
 export function isNetworkError(err: unknown): boolean {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) return true
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   const msg = err instanceof Error ? err.message : typeof err === 'object' && err && 'message' in err ? String(err.message) : String(err)
   return /failed to fetch|network|load failed|fetch failed|timeout|aborted/i.test(msg)
 }

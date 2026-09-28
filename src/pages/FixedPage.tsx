@@ -15,6 +15,7 @@ import { Card, CardTitle, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
 import type { FixedExpenseRow } from '../lib/database.types'
 import { alertItems, daysUntil, fixedStatus, fixedTotals, isCardSource, sortFixed } from '../lib/fixed'
+import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 
 type Editing = { row: FixedExpenseRow | null } | null
@@ -81,7 +82,7 @@ export function FixedPage() {
         <PageHeader title="Sabit Giderler" />
         <Card>
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            Veriler yüklenemedi: {loadError}
+            {loadErrorText('veriler', loadError ?? '')}
           </p>
         </Card>
       </>

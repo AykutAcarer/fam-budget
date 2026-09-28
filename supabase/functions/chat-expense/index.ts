@@ -4,6 +4,8 @@
  * Secret'lar (Supabase Dashboard > Edge Functions > Secrets veya `supabase secrets set`):
  *   ANTHROPIC_API_KEY  — Anthropic API anahtarı (yalnızca burada; istemciye ASLA gitmez)
  *   ANTHROPIC_MODEL    — hızlı bir Haiku sınıfı model, ör. claude-haiku-4-5
+ *   ALLOWED_ORIGINS    — CORS izinli origin'ler, virgülle: https://butcem.vercel.app,http://localhost:5173
+ *                        (alt alan jokeri: https://fam-budget-*.vercel.app; boşsa yalnız localhost)
  * SUPABASE_URL ve SUPABASE_ANON_KEY platform tarafından otomatik verilir.
  *
  * Asıl mantık handler.ts'te (platformdan bağımsız, testli).

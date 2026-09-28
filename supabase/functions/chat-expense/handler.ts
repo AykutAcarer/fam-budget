@@ -94,16 +94,54 @@ export interface HandlerDeps {
 // HTTP yardımcıları
 // ---------------------------------------------------------------------------
 
-export const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
+// ---- CORS -------------------------------------------------------------------
+// İzin verilen origin'ler ALLOWED_ORIGINS secret'ından okunur (virgülle ayrılmış;
+// alt alan adında '*' joker kabul edilir: https://fam-budget-*.vercel.app).
+// Tanımlı değilse yalnızca yerel geliştirme adresleri izinlidir.
+// Not: CORS yetkilendirme değildir; her istek ayrıca JWT ile doğrulanır.
+
+export const DEFAULT_ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+]
+
+const BASE_CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+  Vary: 'Origin',
 }
 
-function json(body: unknown, status = 200): Response {
+/** "https://a.app, https://b-*.vercel.app/" → ['https://a.app', 'https://b-*.vercel.app'] */
+export function parseAllowedOrigins(raw: string | undefined): string[] {
+  const list = (raw ?? '')
+    .split(/[\s,]+/)
+    .map((o) => o.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+  return list.length ? list : DEFAULT_ALLOWED_ORIGINS
+}
+
+export function isOriginAllowed(origin: string | null, allowed: readonly string[]): boolean {
+  if (!origin) return false
+  return allowed.some((pattern) => {
+    if (pattern === '*') return true
+    if (!pattern.includes('*')) return pattern === origin
+    const re = new RegExp('^' + pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[a-z0-9-]+') + '$', 'i')
+    return re.test(origin)
+  })
+}
+
+/** İstek origin'i izinliyse onu yansıtan CORS başlıkları; değilse ACAO olmadan. */
+export function corsHeadersFor(origin: string | null, allowed: readonly string[]): Record<string, string> {
+  return isOriginAllowed(origin, allowed) ? { ...BASE_CORS_HEADERS, 'Access-Control-Allow-Origin': origin! } : { ...BASE_CORS_HEADERS }
+}
+
+function jsonResponse(body: unknown, status: number, cors: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
+    headers: { ...cors, 'Content-Type': 'application/json; charset=utf-8' },
   })
 }
 
@@ -282,7 +320,17 @@ export function sanitizeResult(input: unknown, req: ChatRequest): ChatResult {
 // ---------------------------------------------------------------------------
 
 export async function handleRequest(req: Request, deps: HandlerDeps): Promise<Response> {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS })
+  const origin = req.headers.get('Origin')
+  const allowed = parseAllowedOrigins(deps.env('ALLOWED_ORIGINS'))
+  const cors = corsHeadersFor(origin, allowed)
+  const json = (body: unknown, status = 200) => jsonResponse(body, status, cors)
+
+  // Tarayıcıdan izinsiz bir origin: ön istek başlıksız döner, gerçek istek hiç işlenmez
+  // (Anthropic çağrılmaz). Origin'siz istekler (sunucu, curl) yine JWT ister.
+  if (origin && !isOriginAllowed(origin, allowed)) {
+    return req.method === 'OPTIONS' ? new Response(null, { status: 403, headers: cors }) : json({ error: 'origin_not_allowed' }, 403)
+  }
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405)
 
   const userId = await deps.verifyUser(req)

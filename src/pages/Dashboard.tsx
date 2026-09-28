@@ -19,6 +19,7 @@ import { buildComparison, cycleSummary } from '../lib/budget'
 import { createColorLookup } from '../lib/categoryColors'
 import { cycleLabel, cycleLength, todayIso } from '../lib/cycle'
 import { clampedCycleDay } from '../lib/compare'
+import { loadErrorText } from '../lib/loadError'
 import { useBudgetData } from '../lib/useBudgetData'
 
 export function Dashboard() {
@@ -42,7 +43,7 @@ export function Dashboard() {
       <div className="space-y-4">
         <Card>
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            Veriler yüklenemedi: {error}
+            {loadErrorText('veriler', error ?? '')}
           </p>
         </Card>
         <ChatPanel chat={chat} colorOf={colorOf} />

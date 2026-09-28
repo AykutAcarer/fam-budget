@@ -17,6 +17,7 @@ import { createColorLookup } from '../lib/categoryColors'
 import { categoryBreakdown, dailyCumulativeSeries } from '../lib/compare'
 import { cycleLabel, todayIso } from '../lib/cycle'
 import type { VariableExpenseRow } from '../lib/database.types'
+import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 import { useIsDark } from '../lib/useIsDark'
 
@@ -80,7 +81,7 @@ export function CyclePage() {
         <PageHeader title="Döngü Detay" />
         <Card>
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            Veriler yüklenemedi: {d.loadError}
+            {loadErrorText('veriler', d.loadError)}
           </p>
         </Card>
       </>

@@ -12,6 +12,7 @@ import { Card, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
 import type { DebtRow } from '../lib/database.types'
 import { debtTotals, dueStatus, nextPriority, sortDebts, type DueStatus } from '../lib/debts'
+import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 
 /** 'YYYY-MM' → "Ocak 2027", 'YYYY-MM-DD' → "5 Ocak 2027". */
@@ -113,7 +114,7 @@ export function DebtsPage() {
         <PageHeader title="Borçlar" />
         <Card>
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-            Borçlar yüklenemedi: {loadError}
+            {loadErrorText('borçlar', loadError ?? '')}
           </p>
         </Card>
       </>

@@ -16,7 +16,7 @@ export type { ChatContext, ChatResult, ParsedExpense } from '../../supabase/func
 const TIMEOUT_MS = 15_000
 
 async function invokeChat(body: Record<string, unknown>): Promise<ChatResult> {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) throw new Error('offline')
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('offline')
   const { data, error } = await supabase.functions.invoke<ChatResult>('chat-expense', { body, timeout: TIMEOUT_MS })
   if (error) throw error
   if (!data || !Array.isArray(data.expenses) || typeof data.reply !== 'string') throw new Error('Beklenmeyen cevap')

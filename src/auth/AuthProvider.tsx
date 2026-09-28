@@ -1,7 +1,11 @@
 /**
  * Oturum durumu. Supabase oturumunu dinler ve uygulamaya sağlar.
+ *
+ * Açılışta oturum önce yerelden okunur (çevrimdışı da açılabilsin); çevrimiçiyse
+ * ardından Auth sunucusunda doğrulanır. Sunucu oturumu geçersiz sayarsa yerel
+ * oturum kapatılır. Ağ hatası oturumu kapatmaz (çevrimdışı kuyruk çalışmaya devam eder).
  */
-import type { Session } from '@supabase/supabase-js'
+import { isAuthApiError, type Session } from '@supabase/supabase-js'
 import { createContext, use, useEffect, useState, type ReactNode } from 'react'
 import { supabase, supabaseConfigError } from '../lib/supabase'
 
@@ -18,12 +22,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (supabaseConfigError) return
-    supabase.auth.getSession().then(({ data }) => setState({ session: data.session, loading: false }))
+    supabase.auth.getSession().then(({ data }) => {
+      setState({ session: data.session, loading: false })
+      if (data.session && navigator.onLine) void verifySession()
+    })
     const { data } = supabase.auth.onAuthStateChange((_event, session) => setState({ session, loading: false }))
     return () => data.subscription.unsubscribe()
   }, [])
 
   return <AuthContext value={state}>{children}</AuthContext>
+}
+
+/** Oturumu Auth sunucusunda doğrular; geçersizse (401/403) yerel oturumu kapatır. */
+async function verifySession() {
+  const { error } = await supabase.auth.getUser()
+  if (error && isAuthApiError(error) && (error.status === 401 || error.status === 403)) {
+    await supabase.auth.signOut({ scope: 'local' })
+  }
 }
 
 export function useAuth(): AuthState {

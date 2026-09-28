@@ -5,7 +5,7 @@ Harcamalar serbest Türkçe metinle bir sohbet kutusundan girilir; para matemati
 
 Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_system_prompt.md`](app_system_prompt.md) · Örnek içe aktarma verisi (sentetik): [`ornek_veri.json`](ornek_veri.json)
 
-**Yığın:** Vite + React + TypeScript · Tailwind CSS v4 · Supabase (Auth + Postgres + RLS + Edge Functions) · Claude API · Recharts · react-router · dayjs
+**Yığın:** Vite + React + TypeScript · Tailwind CSS v4 · Supabase (Auth + Postgres + RLS + Edge Functions) · Claude API · Recharts · vite-plugin-pwa · react-router · dayjs
 
 ## Durum
 
@@ -15,7 +15,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [ ] Ayarlar: baz ay seçimi, kategori yönetimi
-- [ ] PWA
+- [x] **PWA:** ana ekrana eklenebilir, çevrimdışı açılan kabuk, "Yeni sürüm var — Yenile" bildirimi
 
 ## Kurulum
 
@@ -62,6 +62,7 @@ Fonksiyon kodu: [`supabase/functions/chat-expense/`](supabase/functions/chat-exp
 |---|---|
 | `ANTHROPIC_API_KEY` | Anthropic Console'dan API anahtarı |
 | `ANTHROPIC_MODEL` | Hızlı bir Haiku sınıfı model: `claude-haiku-4-5` |
+| `ALLOWED_ORIGINS` | Fonksiyonu tarayıcıdan çağırabilecek origin'ler, virgülle: `https://<alan-adın>,http://localhost:5173`. Boşsa yalnız localhost (5173/4173). Bkz. *Üretime alma*. |
 
 CLI ile: `npx supabase secrets set ANTHROPIC_MODEL=claude-haiku-4-5` (anahtar için de aynı komut kullanılabilir).
 `SUPABASE_URL` / `SUPABASE_ANON_KEY` platform tarafından otomatik verilir.
@@ -109,6 +110,43 @@ npm run build      # tip kontrolü + üretim derlemesi
 ```
 
 İlk kullanımda *Ayarlar > Veriyi içe aktar* ile `ornek_veri.json` yüklenirse baz ay, aktif döngü, sabit giderler ve borçlar dolar.
+
+### 5. Üretime alma (Vercel)
+
+1. **Vercel projesi:** repoyu içe aktar (Framework: Vite; build `npm run build`, çıktı `dist`). *Environment Variables*:
+   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (yerel `.env.local` ile aynı değerler). `vercel.json` SPA yönlendirmesini
+   (`/sabit` gibi adresler yenilenince 404 olmaz) ve `sw.js`'in önbelleklenmemesini ayarlar.
+2. **Supabase Auth:** *Authentication > URL Configuration* → *Site URL* = üretim adresi (ör. `https://butcem.vercel.app`);
+   *Redirect URLs*'e aynı adresi (ve yerelde çalışmaya devam edeceksen `http://localhost:5173`) ekle. Aksi halde e-posta
+   doğrulama bağlantıları yanlış adrese gider.
+3. **Edge Function CORS:** `ALLOWED_ORIGINS` secret'ını üretim adresiyle ayarla ve fonksiyonu yeniden deploy et:
+
+   ```bash
+   npx supabase secrets set ALLOWED_ORIGINS="https://butcem.vercel.app,http://localhost:5173"
+   npx supabase functions deploy chat-expense --no-verify-jwt
+   ```
+
+   Vercel önizleme adresleri için joker kullanılabilir: `https://fam-budget-*.vercel.app`. Listede olmayan bir origin'den
+   gelen tarayıcı isteği 403 alır (Anthropic çağrılmaz). CORS yetkilendirme değildir; her istek ayrıca JWT ile doğrulanır.
+
+## PWA (ana ekrana ekle + çevrimdışı)
+
+Ayarlar [`pwa.config.ts`](pwa.config.ts)'te (vite-plugin-pwa / Workbox); güvenlik kararları `src/lib/pwaConfig.test.ts` ile kilitli.
+
+- **Manifest:** "Bütçem", `standalone`, `portrait`, `tr`; ikonlar `public/` altında (192, 512, maskable 512, iOS için
+  `apple-touch-icon.png` 180). İkonlar yer tutucudur; aynı adlarla değiştirilebilir.
+- **Service worker:** yalnızca build çıktısını (JS/CSS/HTML kabuğu, ikonlar) önbelleğe alır; navigasyonlarda `index.html`'e
+  düşer. **Kullanıcı verisi hiç önbelleğe alınmaz:** runtime cache yok; Supabase (Auth, REST, Edge Function) başka origin'de
+  olduğu için SW bu isteklere dokunmaz, her zaman ağdan gider. Çevrimdışıyken uygulama açılır, veri ekranları "çevrimdışı"
+  mesajı gösterir; sohbetten girilen harcamalar cihazdaki kuyrukta bekler ve bağlantı gelince gönderilir.
+- **Oturum:** açılışta oturum yerelden okunur (çevrimdışı açılabilsin), çevrimiçiyse Auth sunucusunda doğrulanır; sunucu
+  geçersiz sayarsa (401/403) yerel oturum kapatılır.
+- **Güncelleme:** `registerType: 'prompt'` — yeni sürüm yüklenince üstte "Yeni sürüm var — Yenile" çıkar; sessiz güncelleme
+  yok. Açık kalan uygulama saatte bir yeni sürüm kontrol eder.
+- **iOS:** `apple-mobile-web-app-*` etiketleri, `viewport-fit=cover`; alt tab bar ve sohbet kutusu
+  `env(safe-area-inset-bottom)` ile güvenli alana oturur. Durum çubuğu rengi (`theme-color`) seçili temanın zeminine eşitlenir.
+- **Yerelde deneme:** `npm run build && npx vite preview` → http://localhost:4173 (SW yalnızca üretim derlemesinde çalışır).
+  Chrome DevTools > Application: Manifest ve Service Worker; Network > Offline ile çevrimdışı açılış.
 
 ## Sohbetle harcama girişi — nasıl çalışır
 
@@ -241,8 +279,10 @@ src/
     debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...
+pwa.config.ts               PWA manifest + service worker ayarları
+vercel.json                 SPA yönlendirmesi + önbellek başlıkları
 supabase/
-  functions/chat-expense/     Edge Function (Claude API)
+  functions/chat-expense/     Edge Function (Claude API, CORS izin listesi)
   migrations/                 şema + RLS + import_data
   tests/                      veritabanı ve Edge Function testleri
 scripts/sync-system-prompt.mjs

@@ -18,9 +18,13 @@ function readPref(): ThemePref {
   return 'system'
 }
 
+/** Sayfa zemini (slate-50 / slate-950); durum çubuğu rengi (theme-color) buna eşitlenir. */
+const THEME_COLOR = { light: '#F8FAFC', dark: '#020617' }
+
 function applyPref(pref: ThemePref) {
   const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
   document.documentElement.classList.toggle('dark', dark)
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? THEME_COLOR.dark : THEME_COLOR.light)
 }
 
 export function useTheme(): [ThemePref, (pref: ThemePref) => void] {

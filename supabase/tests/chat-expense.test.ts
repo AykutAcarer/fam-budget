@@ -6,8 +6,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  DEFAULT_ALLOWED_ORIGINS,
   DEFAULT_CATEGORY_KEYS,
   handleRequest,
+  isOriginAllowed,
+  parseAllowedOrigins,
   TOOL_NAME,
   type ChatResult,
   type HandlerDeps,
@@ -229,5 +232,80 @@ describe('hata yolları', () => {
     expect(verifyUser).not.toHaveBeenCalled()
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain('authorization')
+  })
+})
+
+describe('CORS', () => {
+  const PROD = 'https://butcem.vercel.app'
+  const request = (method: string, origin?: string) =>
+    new Request('http://localhost/chat-expense', {
+      method,
+      headers: { Authorization: 'Bearer valid', 'content-type': 'application/json', ...(origin ? { Origin: origin } : {}) },
+      body: method === 'POST' ? JSON.stringify(parseBody('8,25 halısaha')) : undefined,
+    })
+
+  function deps(allowedOrigins?: string) {
+    const fetchMock = vi.fn(async () => claudeResponse({ expenses: [], reply: 'ok', clarify: null }))
+    const env: Record<string, string | undefined> = { ANTHROPIC_API_KEY: 'k', ANTHROPIC_MODEL: 'm', ALLOWED_ORIGINS: allowedOrigins }
+    const d: HandlerDeps = {
+      env: (n) => env[n],
+      fetch: fetchMock as unknown as typeof fetch,
+      verifyUser: async () => 'user-1',
+      systemPrompt: '',
+    }
+    return { d, fetchMock }
+  }
+
+  it('parseAllowedOrigins: virgül/boşluk, sondaki / temizlenir; boşsa yerel varsayılanlar', () => {
+    expect(parseAllowedOrigins(`${PROD}/, http://localhost:5173`)).toEqual([PROD, 'http://localhost:5173'])
+    expect(parseAllowedOrigins(undefined)).toEqual(DEFAULT_ALLOWED_ORIGINS)
+    expect(parseAllowedOrigins('  ')).toEqual(DEFAULT_ALLOWED_ORIGINS)
+  })
+
+  it('isOriginAllowed: tam eşleşme ve alt alan jokeri', () => {
+    const list = [PROD, 'https://fam-budget-*.vercel.app']
+    expect(isOriginAllowed(PROD, list)).toBe(true)
+    expect(isOriginAllowed('https://fam-budget-git-main-aykut.vercel.app', list)).toBe(true)
+    expect(isOriginAllowed('https://evil.vercel.app', list)).toBe(false)
+    expect(isOriginAllowed('https://fam-budget-x.vercel.app.evil.com', list)).toBe(false)
+    expect(isOriginAllowed('https://butcem.vercel.app.evil.com', list)).toBe(false)
+    expect(isOriginAllowed(null, list)).toBe(false)
+  })
+
+  it('izinli origin: ön istek 204 + origin yansıtılır; gerçek yanıtta da ACAO var', async () => {
+    const { d } = deps(PROD)
+    const pre = await handleRequest(request('OPTIONS', PROD), d)
+    expect(pre.status).toBe(204)
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(PROD)
+    expect(pre.headers.get('Access-Control-Allow-Headers')).toContain('authorization')
+    expect(pre.headers.get('Access-Control-Allow-Headers')).toContain('content-type')
+    expect(pre.headers.get('Vary')).toBe('Origin')
+    const res = await handleRequest(request('POST', PROD), d)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(PROD)
+  })
+
+  it('izinsiz origin: 403, ACAO yok, Anthropic çağrılmaz', async () => {
+    const { d, fetchMock } = deps(PROD)
+    const pre = await handleRequest(request('OPTIONS', 'https://evil.example'), d)
+    expect(pre.status).toBe(403)
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    const res = await handleRequest(request('POST', 'https://evil.example'), d)
+    expect(res.status).toBe(403)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("secret yoksa yalnız yerel geliştirme origin'leri", async () => {
+    const { d } = deps(undefined)
+    expect((await handleRequest(request('OPTIONS', 'http://localhost:5173'), d)).status).toBe(204)
+    expect((await handleRequest(request('OPTIONS', PROD), d)).status).toBe(403)
+  })
+
+  it("origin'siz istek (sunucu/curl) CORS'a takılmaz ama JWT ister", async () => {
+    const { d } = deps(PROD)
+    expect((await handleRequest(request('POST'), d)).status).toBe(200)
+    const noAuth = { ...d, verifyUser: async () => null }
+    expect((await handleRequest(request('POST'), noAuth)).status).toBe(401)
   })
 })
