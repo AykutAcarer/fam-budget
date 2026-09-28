@@ -12,7 +12,8 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **1. katman:** iskelet, Supabase auth (kayıt/giriş/çıkış), tablolar + RLS, boş dashboard, tema
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
 - [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
-- [ ] Döngü detay, borçlar ekranları
+- [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
+- [ ] Döngü detay ekranı
 - [ ] Ayarlar: baz ay seçimi, kategori yönetimi
 - [ ] PWA
 
@@ -186,6 +187,19 @@ durumlar [`src/lib/fixed.ts`](src/lib/fixed.ts)'ten gelir; dashboard'daki sabit 
 Gün girildiğinde döngü içindeki tarihe yerleşir (15 Eyl – 14 Eki döngüsünde 22 → 22 Eyl, 7 → 7 Eki). Yaklaşan uyarısı
 şimdilik yalnızca uygulama içi şerittir; telefon bildirimi PWA katmanında gelecek. Kalan taksit sayısı elle düzenlenir.
 
+## Borçlar
+
+*Borçlar* sekmesi toplamları ve sıralamayı [`src/lib/debts.ts`](src/lib/debts.ts)'ten alır (dashboard'daki "Toplam borç"
+kartı da aynı fonksiyonu kullanır). Şema değişikliği yoktur.
+
+- **Sıralama:** faizliler önce, faiz metninden okunan orana göre yüksekten düşüğe ("~%17,5/yıl" → 17,5; okunamazsa sona);
+  sonra faizsizler öncelik numarasına göre. Eşitlikte öncelik, sonra yüksek bakiye, sonra ad.
+- **"Önce bunu öde":** listede en üstteki (en pahalı) kapanmamış faizli borç. Tüm faizliler kırmızı vurgulanır.
+- **Vade:** `YYYY-MM-DD` ya da yalnız ay (`YYYY-MM`, hesapta ayın ilk günü sayılır). Bugünden 0–30 gün içindeyse
+  "vade yaklaşıyor", geçmişse "vadesi geçti".
+- Bakiye Türkçe biçimde girilir ("6.026,31"); kısmi ödemeden sonra düzenle ile yeni bakiye yazılır. Ödeme geçmişi ve
+  ödeme planı bu sürümde yok.
+
 ## Döngü mantığı
 
 Döngü takvim ayı değildir: her ayın **15'inde** başlar, ertesi ayın **14'ünde** biter. Döngü günü 1 = 15'i.
@@ -210,6 +224,7 @@ src/
     expensesApi.ts, outbox.ts harcama kaydı + çevrimdışı kuyruk
     transfer.ts               içe aktarma doğrulama / dışa aktarma (saf)
     fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase
+    debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...
 supabase/

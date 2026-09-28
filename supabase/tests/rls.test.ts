@@ -134,6 +134,15 @@ describe('RLS izolasyonu', () => {
     expect(rows.rows[0].amount).toBe('8.25')
   })
 
+  it('B, A\'nın borcunu güncelleyemez/silemez', async () => {
+    await asUser(USER_B, async () => {
+      expect((await db.query(`update public.debts set balance = 0`)).affectedRows).toBe(0)
+      expect((await db.query(`delete from public.debts`)).affectedRows).toBe(0)
+    })
+    const rows = await asUser(USER_A, () => db.query<{ balance: string }>(`select balance from public.debts`))
+    expect(rows.rows).toEqual([{ balance: '6026.31' }])
+  })
+
   it('anon hiçbir tabloyu okuyamaz', async () => {
     await expect(asUser(null, () => db.query('select * from public.cycles'))).rejects.toThrow(/permission denied/)
   })

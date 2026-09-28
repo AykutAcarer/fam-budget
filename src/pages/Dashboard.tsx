@@ -12,6 +12,7 @@ import { ChatPanel } from '../components/chat/ChatPanel'
 import { useChat } from '../components/chat/useChat'
 import { CategoryCard } from '../components/dashboard/CategoryCard'
 import { ComparisonCard } from '../components/dashboard/ComparisonCard'
+import { DebtSummaryCard } from '../components/dashboard/DebtSummaryCard'
 import { KpiGrid } from '../components/dashboard/KpiGrid'
 import { Card, Spinner } from '../components/ui'
 import { buildComparison, cycleSummary } from '../lib/budget'
@@ -98,6 +99,8 @@ export function Dashboard() {
       />
 
       <KpiGrid summary={summary} />
+
+      <DebtSummaryCard />
 
       <CategoryCard slices={summary.byCategory} total={summary.variable} />
 
