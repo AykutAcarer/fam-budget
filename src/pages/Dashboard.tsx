@@ -1,74 +1,41 @@
 /**
  * Ana Ekran (Dashboard).
  *
- * Şimdilik iskelet: aktif döngü + döngü günü gerçek; kıyas kartı, KPI'lar,
- * kategori dağılımı ve sohbet girişi boş durumda. Rakamlar sonraki adımda
- * kodla (deterministik) hesaplanacak.
+ * Aktif döngü + döngü günü, sohbetle harcama girişi. Kıyas kartı, KPI'lar ve
+ * kategori dağılımı kodla (deterministik) hesaplanır.
  */
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { SendIcon } from '../components/icons'
+import { useAuth } from '../auth/AuthProvider'
+import { ChatPanel } from '../components/chat/ChatPanel'
+import { useChat } from '../components/chat/useChat'
 import { Card, CardTitle, Spinner } from '../components/ui'
-import { cycleDay, cycleLabel, cycleLength, cycleWindowFor, todayIso } from '../lib/cycle'
-import type { CycleRow } from '../lib/database.types'
-import { supabase } from '../lib/supabase'
-
-interface ActiveCycle {
-  label: string
-  start: string
-  end: string
-  /** Veritabanında kayıtlı mı, yoksa tarihten mi hesaplandı? */
-  saved: boolean
-}
-
-interface DashboardData {
-  active: ActiveCycle
-  baseline: CycleRow | null
-}
-
-async function loadDashboard(today: string): Promise<DashboardData> {
-  const [activeRes, baselineRes] = await Promise.all([
-    supabase.from('cycles').select('*').lte('start_date', today).gte('end_date', today).limit(1).maybeSingle(),
-    supabase.from('cycles').select('*').eq('is_baseline', true).maybeSingle(),
-  ])
-  if (activeRes.error) throw activeRes.error
-  if (baselineRes.error) throw baselineRes.error
-
-  const row = activeRes.data
-  const window = cycleWindowFor(today)
-  return {
-    active: row
-      ? { label: cycleLabel(row.start_date, row.end_date), start: row.start_date, end: row.end_date, saved: true }
-      : { label: window.label, start: window.start, end: window.end, saved: false },
-    baseline: baselineRes.data,
-  }
-}
+import { cycleDay, cycleLabel, cycleLength, todayIso } from '../lib/cycle'
+import { useBudgetData } from '../lib/useBudgetData'
 
 export function Dashboard() {
+  const { session } = useAuth()
   const [today] = useState(todayIso)
-  const [data, setData] = useState<DashboardData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { data, error, reload } = useBudgetData(today)
+  const chat = useChat({ userId: session!.user.id, today, data, reload })
+  const colors = useMemo(() => new Map(data?.categories.map((c) => [c.key, c.color])), [data])
 
-  useEffect(() => {
-    let cancelled = false
-    loadDashboard(today)
-      .then((d) => !cancelled && setData(d))
-      .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : 'Veriler yüklenemedi.'))
-    return () => {
-      cancelled = true
-    }
-  }, [today])
+  if (!data && !error) return <Spinner />
 
-  if (error) {
+  if (!data) {
+    // Veri yüklenemedi (ör. çevrimdışı): sohbet yine çalışır, harcamalar cihazda bekler.
     return (
-      <Card className="mt-4">
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">Veriler yüklenemedi: {error}</p>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">Veriler yüklenemedi: {error}</p>
+        </Card>
+        <ChatPanel chat={chat} colors={colors} />
+      </div>
     )
   }
-  if (!data) return <Spinner />
 
-  const { active, baseline } = data
+  const active = { ...data.active.window, saved: data.active.cycle !== null }
+  const baseline = data.baseline?.cycle ?? null
   const day = cycleDay(active.start, today)
   const total = cycleLength(active.start, active.end)
 
@@ -144,43 +111,7 @@ export function Dashboard() {
         </div>
       </Card>
 
-      {/* Sohbet akışı */}
-      <Card>
-        <CardTitle>Sohbet</CardTitle>
-        <div className="mt-3 flex">
-          <p className="max-w-[85%] rounded-2xl rounded-tl-md bg-slate-100 px-3.5 py-2.5 text-sm dark:bg-slate-800">
-            Merhaba! Harcamanı buraya yazman yeterli, ör. <b>“8,25 halısaha”</b> ya da{' '}
-            <b>“işte öğlen atıştırmalık 3,72”</b>. Gerisini ben hallederim. 💪
-          </p>
-        </div>
-      </Card>
-
-      {/* Sabit sohbet kutusunun kapladığı alan kadar boşluk */}
-      <div className="h-16" aria-hidden="true" />
-
-      {/* Sohbet kutusu — tab bar'ın hemen üstünde sabit */}
-      <form
-        onSubmit={(e) => e.preventDefault()}
-        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 border-t border-slate-200 bg-slate-50/95 px-4 py-2 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95"
-      >
-        <div className="mx-auto flex max-w-2xl items-center gap-2">
-          <input
-            type="text"
-            disabled
-            aria-label="Harcama yaz"
-            placeholder="Sohbetle harcama girişi çok yakında…"
-            className="h-12 flex-1 rounded-full border-0 bg-white px-4 text-base shadow-sm ring-1 ring-slate-900/10 placeholder:text-slate-400 disabled:opacity-70 dark:bg-slate-900 dark:ring-white/10"
-          />
-          <button
-            type="submit"
-            disabled
-            aria-label="Gönder"
-            className="flex size-12 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-50"
-          >
-            <SendIcon className="size-5" />
-          </button>
-        </div>
-      </form>
+      <ChatPanel chat={chat} colors={colors} />
     </div>
   )
 }

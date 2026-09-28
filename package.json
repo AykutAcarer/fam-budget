@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync:prompt": "node scripts/sync-system-prompt.mjs",
+    "test:ai": "vitest run supabase/tests/chat-expense.live.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
