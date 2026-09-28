@@ -3,6 +3,7 @@
  * alınır; harcama asla kaybolmaz.
  */
 import { cycleWindowFor } from './cycle'
+import type { VariableExpenseRow } from './database.types'
 import { addToOutbox, readOutbox, removeFromOutbox, type NewExpense } from './outbox'
 import { supabase } from './supabase'
 
@@ -84,4 +85,14 @@ export async function deleteExpenses(userId: string, ids: string[]): Promise<voi
   removeFromOutbox(userId, ids)
   const { error } = await supabase.from('variable_expenses').delete().in('id', ids)
   if (error) throw error
+}
+
+/** Mevcut harcamayı günceller (kategori, tutar, tarih, açıklama). */
+export async function updateExpense(
+  id: string,
+  patch: Pick<VariableExpenseRow, 'category' | 'amount' | 'date' | 'description'>,
+): Promise<VariableExpenseRow> {
+  const { data, error } = await supabase.from('variable_expenses').update(patch).eq('id', id).select('*').single()
+  if (error) throw error
+  return data
 }

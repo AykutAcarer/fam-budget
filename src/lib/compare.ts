@@ -108,3 +108,177 @@ export function compareToBaseline(params: {
     kategori,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Döngü detay ekranı: döngü seçici, kategori özeti, gün gün kümülatif seri
+// ---------------------------------------------------------------------------
+
+const isDortlu = (category: string) => (DORTLU as readonly string[]).includes(category)
+
+export interface CycleLike {
+  id: string
+  label: string
+  start_date: string
+  end_date: string
+  is_baseline: boolean
+}
+
+export interface CycleOption<T extends CycleLike = CycleLike> {
+  cycle: T
+  /** Bugünü içeren döngü mü? */
+  isActive: boolean
+  isBaseline: boolean
+}
+
+/** Döngü seçici: en yeniden eskiye; aktif ve baz ay işaretli. */
+export function cycleOptions<T extends CycleLike>(cycles: readonly T[], today: string): CycleOption<T>[] {
+  return [...cycles]
+    .sort((a, b) => b.start_date.localeCompare(a.start_date))
+    .map((cycle) => ({
+      cycle,
+      isActive: cycle.start_date <= today && today <= cycle.end_date,
+      isBaseline: cycle.is_baseline,
+    }))
+}
+
+/** Varsayılan seçim: aktif döngü; yoksa bugünden önce başlayan en yeni; o da yoksa en yeni. */
+export function defaultCycleId(options: readonly CycleOption[], today: string): string | null {
+  return (
+    options.find((o) => o.isActive)?.cycle.id ??
+    options.find((o) => o.cycle.start_date <= today)?.cycle.id ??
+    options[0]?.cycle.id ??
+    null
+  )
+}
+
+export interface CategoryMeta {
+  key: string
+  label: string
+  type: string
+  sort_order: number
+}
+
+export interface CategoryBreakdownRow {
+  key: string
+  label: string
+  type: string
+  dortlu: boolean
+  /** Seçili döngüdeki toplam. */
+  current: number
+  /** Baz ayın tamamındaki toplam; baz ay yoksa null. */
+  baseline: number | null
+  /** current − baseline; baz ay yoksa null. */
+  diff: number | null
+}
+
+export interface CategoryBreakdown {
+  /** Kısılabilir dörtlü satırları (tutara göre azalan). */
+  dortlu: CategoryBreakdownRow[]
+  /** Diğer kategoriler (tutara göre azalan). */
+  others: CategoryBreakdownRow[]
+  /** Dörtlü ara toplamı (grafiğin son noktasıyla aynı). */
+  dortluTotal: { current: number; baseline: number | null; diff: number | null }
+  /** Seçili döngünün tüm değişken harcaması. */
+  total: number
+}
+
+function centsByCategory(expenses: readonly ExpenseLike[], start: string, end: string): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const e of expenses) {
+    if (e.date < start || e.date > end) continue
+    map.set(e.category, (map.get(e.category) ?? 0) + toCents(e.amount))
+  }
+  return map
+}
+
+/**
+ * Seçili döngünün kategori toplamları + baz ayın aynı kategorideki (tüm ay)
+ * toplamı. Her iki döngüde de harcaması olmayan kategoriler listelenmez.
+ */
+export function categoryBreakdown(params: {
+  selected: CycleExpenses
+  baseline: CycleExpenses | null
+  categories: readonly CategoryMeta[]
+}): CategoryBreakdown {
+  const { selected, baseline, categories } = params
+  const cur = centsByCategory(selected.expenses, selected.start, selected.end)
+  const base = baseline ? centsByCategory(baseline.expenses, baseline.start, baseline.end) : null
+  const meta = new Map(categories.map((c) => [c.key, c]))
+
+  const keys = new Set([...cur.keys(), ...(base?.keys() ?? [])])
+  const rows: CategoryBreakdownRow[] = [...keys].map((key) => {
+    const c = cur.get(key) ?? 0
+    const b = base ? (base.get(key) ?? 0) : null
+    return {
+      key,
+      label: meta.get(key)?.label ?? key,
+      type: meta.get(key)?.type ?? 'kisilabilir',
+      dortlu: isDortlu(key),
+      current: fromCents(c),
+      baseline: b === null ? null : fromCents(b),
+      diff: b === null ? null : fromCents(c - b),
+    }
+  })
+  const order = (a: CategoryBreakdownRow, b: CategoryBreakdownRow) =>
+    b.current - a.current || (b.baseline ?? 0) - (a.baseline ?? 0) || (meta.get(a.key)?.sort_order ?? 99) - (meta.get(b.key)?.sort_order ?? 99)
+
+  const dortluCur = [...cur].filter(([k]) => isDortlu(k)).reduce((s, [, v]) => s + v, 0)
+  const dortluBase = base ? [...base].filter(([k]) => isDortlu(k)).reduce((s, [, v]) => s + v, 0) : null
+  return {
+    dortlu: rows.filter((r) => r.dortlu).sort(order),
+    others: rows.filter((r) => !r.dortlu).sort(order),
+    dortluTotal: {
+      current: fromCents(dortluCur),
+      baseline: dortluBase === null ? null : fromCents(dortluBase),
+      diff: dortluBase === null ? null : fromCents(dortluCur - dortluBase),
+    },
+    total: fromCents([...cur.values()].reduce((a, b) => a + b, 0)),
+  }
+}
+
+export interface DailyPoint {
+  /** Döngü günü (1'den başlar). */
+  day: number
+  /** Seçili döngünün o güne kadarki dörtlü kümülatifi; gelecek/olmayan gün için null. */
+  current: number | null
+  /** Baz ayın o güne kadarki dörtlü kümülatifi; baz ay yoksa ya da o gün yoksa null. */
+  baseline: number | null
+}
+
+/** Döngü günlerine göre dörtlü harcamanın kümülatif serisi (sent → euro). */
+function dortluCumulative(cycle: CycleExpenses, lastDay: number): number[] {
+  const perDay = new Array<number>(lastDay + 1).fill(0)
+  for (const e of cycle.expenses) {
+    if (!isDortlu(e.category) || e.date < cycle.start || e.date > cycle.end) continue
+    const d = cycleDay(cycle.start, e.date)
+    if (d <= lastDay) perDay[d] += toCents(e.amount)
+  }
+  const out: number[] = []
+  let acc = 0
+  for (let d = 1; d <= lastDay; d++) out.push(fromCents((acc += perDay[d])))
+  return out
+}
+
+/**
+ * Gün gün kümülatif kısılabilir dörtlü (grafik). x ekseni 1..max(döngü uzunlukları).
+ * Seçili döngü aktifse yalnızca bugüne kadar dolu, sonrası null; henüz
+ * başlamamışsa tamamı null. Baz ay serisi döngünün tamamı boyunca.
+ */
+export function dailyCumulativeSeries(params: {
+  selected: CycleExpenses
+  baseline: CycleExpenses | null
+  today: string
+}): DailyPoint[] {
+  const { selected, baseline, today } = params
+  const selLen = cycleLength(selected.start, selected.end)
+  const baseLen = baseline ? cycleLength(baseline.start, baseline.end) : 0
+  const lastDrawn = today < selected.start ? 0 : today > selected.end ? selLen : cycleDay(selected.start, today)
+
+  const cur = dortluCumulative(selected, lastDrawn)
+  const base = baseline ? dortluCumulative(baseline, baseLen) : []
+  return Array.from({ length: Math.max(selLen, baseLen) }, (_, i) => ({
+    day: i + 1,
+    current: i < lastDrawn ? cur[i] : null,
+    baseline: baseline && i < baseLen ? base[i] : null,
+  }))
+}

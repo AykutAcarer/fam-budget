@@ -13,7 +13,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
 - [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
-- [ ] Döngü detay ekranı
+- [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [ ] Ayarlar: baz ay seçimi, kategori yönetimi
 - [ ] PWA
 
@@ -171,6 +171,19 @@ Palet açık (#ffffff) ve koyu (#0f172a) zeminde ≥ 3:1 kontrastlıdır; donut'
 ΔE ≥ 8, normal görüşte ΔE ≥ 15 ayrışır (`src/lib/categoryColors.test.ts`). Renk değiştirmek için: tek kaynağı güncelle,
 yeni seed + eski renkleri taşıyan bir migration ekle (örnek: `20260930000000_accessible_category_colors.sql`).
 
+## Döngü detay
+
+*Döngü* sekmesi: döngü seçici (en yeniden eskiye; aktif ve baz ay rozetli), gün gün kümülatif kısılabilir dörtlü grafiği,
+kategori özeti ve değişken harcama listesi. Hesaplar [`compare.ts`](src/lib/compare.ts)'te (`cycleOptions`,
+`categoryBreakdown`, `dailyCumulativeSeries`) — dashboard kıyas kartıyla aynı döngü günü ve dörtlü tanımı; bir test,
+grafiğin bugünkü noktasının kıyas kartındaki "bu ay / baz ay" ile aynı olduğunu doğrular.
+
+- **Grafik:** "Bu döngü" düz yeşil, "Baz ay" kesikli gri (yalnız renkle ayrılmaz). Aktif döngüde çizgi bugünde biter.
+  Baz ay yoksa tek çizgi + "baz ay seçili değil" ipucu.
+- **Kategori özeti:** kısılabilir dörtlü ayrı grup + ara toplam; her satırda bu döngü, baz ayın tamamı ve fark (▲/▼ + işaret).
+- **Harcamalar:** en yeni üstte; kategori, tutar, tarih (döngü içinde) ve açıklama düzenlenir, iki adımlı onayla silinir.
+  Yeni harcama buradan girilmez (sohbetten girilir).
+
 ## Sabit giderler / ödeme takvimi
 
 *Sabit* sekmesi aktif döngünün sabit giderlerini ödeme gününe göre listeler. Toplamlar (toplam / ödenen / kalan) ve
@@ -216,7 +229,8 @@ src/
     dashboard/                kıyas kartı, KPI'lar, kategori donut'u + tablosu
     DataTransferCard.tsx      Ayarlar > içe/dışa aktarma
   lib/
-    compare.ts                kıyas motoru (saf, testli)
+    compare.ts                kıyas motoru + döngü detay serileri (saf, testli)
+    expenseEdit.ts            harcama düzenleme doğrulaması (saf, testli)
     budget.ts                 dashboard verisi → kıyas, KPI'lar, kategori dağılımı (saf, testli)
     chatFlow.ts               sohbet akışı: parse → onay → kaydet → kıyas → cevap (testli)
     chatText.ts               kodla üretilen özet + AI cevabı rakam doğrulaması

@@ -5,10 +5,10 @@ import { AppLayout } from './components/AppLayout'
 import { Spinner } from './components/ui'
 import { supabaseConfigError } from './lib/supabase'
 import { AuthPage } from './pages/AuthPage'
+import { CyclePage } from './pages/CyclePage'
 import { Dashboard } from './pages/Dashboard'
 import { DebtsPage } from './pages/DebtsPage'
 import { FixedPage } from './pages/FixedPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 /** Oturum yoksa giriş ekranına yönlendirir. */
@@ -41,7 +41,7 @@ export default function App() {
       <Route path="/giris" element={<GuestOnly><AuthPage /></GuestOnly>} />
       <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
-        <Route path="dongu" element={<PlaceholderPage title="Döngü Detay" />} />
+        <Route path="dongu" element={<CyclePage />} />
         <Route path="sabit" element={<FixedPage />} />
         <Route path="borclar" element={<DebtsPage />} />
         <Route path="ayarlar" element={<SettingsPage />} />
