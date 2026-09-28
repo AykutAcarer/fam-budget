@@ -15,7 +15,7 @@ import { useCycleDetail } from '../components/cycle/useCycleDetail'
 import { Card, CardTitle, PageHeader, Spinner } from '../components/ui'
 import { createColorLookup } from '../lib/categoryColors'
 import { categoryBreakdown, dailyCumulativeSeries } from '../lib/compare'
-import { cycleLabel, todayIso } from '../lib/cycle'
+import { cycleLabel, sameLabel, todayIso } from '../lib/cycle'
 import type { VariableExpenseRow } from '../lib/database.types'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
@@ -142,7 +142,7 @@ export function CyclePage() {
           )
         })}
       </div>
-      {selected.label && selected.label !== cycleLabel(selected.start_date, selected.end_date) && (
+      {selected.label && !sameLabel(selected.label, cycleLabel(selected.start_date, selected.end_date)) && (
         <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">{selected.label}</p>
       )}
 

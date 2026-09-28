@@ -40,7 +40,7 @@ export function ComparisonCard({ comparison, day, baselineLabel, activeIsBaselin
               <Link to="/ayarlar" className="font-semibold text-emerald-700 underline underline-offset-2 dark:text-emerald-400">
                 Ayarlar
               </Link>
-              ’dan baz ayı içeren verini içe aktarabilirsin.
+              ’dan baz ay seç (ya da geçmiş verini içe aktar).
             </>
           )}
         </p>

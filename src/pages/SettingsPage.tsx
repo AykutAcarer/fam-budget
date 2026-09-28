@@ -1,9 +1,10 @@
 /**
- * Ayarlar: tema, veri içe/dışa aktarma, çıkış.
- * (Baz ay seçimi ve kategori yönetimi sonraki adımlarda.)
+ * Ayarlar: baz ay, tema, veri içe/dışa aktarma, çıkış.
+ * (Kategori yönetimi sonraki adımlarda.)
  */
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { BaselineCard } from '../components/BaselineCard'
 import { DataTransferCard } from '../components/DataTransferCard'
 import { Card, CardTitle, PageHeader } from '../components/ui'
 import { supabase } from '../lib/supabase'
@@ -31,6 +32,8 @@ export function SettingsPage() {
       <PageHeader title="Ayarlar" subtitle={session?.user.email} />
 
       <div className="space-y-4">
+        <BaselineCard />
+
         <Card>
           <CardTitle>Tema</CardTitle>
           <div role="radiogroup" aria-label="Tema" className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">

@@ -9,6 +9,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { compareToBaseline } from '../../src/lib/compare'
 import { normalizeImport } from '../../src/lib/transfer'
 
 const MIGRATIONS_DIR = join(import.meta.dirname, '..', 'migrations')
@@ -166,6 +167,39 @@ describe('baz ay', () => {
       await db.query('select public.set_baseline_cycle($1)', [c2])
       const res = await db.query<{ id: string }>('select id from public.cycles where is_baseline')
       expect(res.rows.map((r) => r.id)).toEqual([c2])
+    })
+  })
+
+  it('baz ay değişince tek baz ay kalır ve kıyas yeni baz ayın harcamalarını kullanır', async () => {
+    await asUser(USER_B, async () => {
+      const ids = (await db.query<{ id: string; key: string }>(`select id, key from public.cycles order by key`)).rows
+      const byKey = Object.fromEntries(ids.map((r) => [r.key, r.id]))
+      // Aynı döngü gününde (3. gün) farklı dörtlü harcamalar.
+      await db.query(`insert into public.variable_expenses (cycle_id, date, category, amount) values ($1, '2026-07-17', 'sosyal', 10)`, [byKey['2026-07']])
+      await db.query(`insert into public.variable_expenses (cycle_id, date, category, amount) values ($1, '2026-08-17', 'sosyal', 25)`, [byKey['2026-08']])
+
+      const comparisonWithBaseline = async () => {
+        const base = (await db.query<{ id: string; start_date: string; end_date: string }>(
+          `select id, to_char(start_date,'YYYY-MM-DD') as start_date, to_char(end_date,'YYYY-MM-DD') as end_date from public.cycles where is_baseline`,
+        )).rows
+        expect(base).toHaveLength(1)
+        const exp = (await db.query<{ date: string; category: string; amount: string }>(
+          `select to_char(date,'YYYY-MM-DD') as date, category, amount from public.variable_expenses where cycle_id = $1`,
+          [base[0].id],
+        )).rows.map((r) => ({ ...r, amount: Number(r.amount) }))
+        return compareToBaseline({
+          active: { start: '2026-09-15', end: '2026-10-14', expenses: [] },
+          baseline: { start: base[0].start_date, end: base[0].end_date, expenses: exp },
+          today: '2026-09-17',
+        })!
+      }
+
+      await db.query('select public.set_baseline_cycle($1)', [byKey['2026-07']])
+      expect((await comparisonWithBaseline()).dortluBazAy).toBe(10)
+      await db.query('select public.set_baseline_cycle($1)', [byKey['2026-08']])
+      expect((await comparisonWithBaseline()).dortluBazAy).toBe(25)
+      const n = await db.query<{ n: number }>(`select count(*)::int as n from public.cycles where is_baseline`)
+      expect(n.rows[0].n).toBe(1)
     })
   })
 

@@ -62,3 +62,9 @@ export function cycleLength(start: string, end: string): number {
 export function todayIso(): string {
   return dayjs().format(ISO)
 }
+
+/** İki etiket yalnızca noktalama/boşlukta mı farklı? ("15 Eyl - 14 Eki" ≈ "15 Eyl – 14 Eki") */
+export function sameLabel(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLocaleLowerCase('tr-TR').replace(/[^\p{L}\p{N}]/gu, '')
+  return norm(a) === norm(b)
+}

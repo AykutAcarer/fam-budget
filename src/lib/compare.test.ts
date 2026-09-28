@@ -6,6 +6,7 @@ import {
   cycleOptions,
   dailyCumulativeSeries,
   defaultCycleId,
+  withBaseline,
   DORTLU,
   dortluTotal,
   type CycleExpenses,
@@ -160,6 +161,17 @@ describe('cycleOptions / defaultCycleId', () => {
     expect(defaultCycleId(cycleOptions(cycles, '2027-03-01'), '2027-03-01')).toBe('2026-10')
     expect(defaultCycleId(cycleOptions(cycles, '2026-01-01'), '2026-01-01')).toBe('2026-10')
     expect(defaultCycleId([], '2026-09-28')).toBeNull()
+  })
+})
+
+describe('withBaseline', () => {
+  it('seçilen döngü baz ay, diğerleri değil; girdiyi değiştirmez', () => {
+    const cycles = [cyc('a', '2026-07-15', '2026-08-14', true), cyc('b', '2026-08-15', '2026-09-14'), cyc('c', '2026-09-15', '2026-10-14')]
+    const next = withBaseline(cycles, 'b')
+    expect(next.filter((c) => c.is_baseline).map((c) => c.id)).toEqual(['b'])
+    expect(cycles[0].is_baseline).toBe(true)
+    // Seçici yeni baz ayı gösterir.
+    expect(cycleOptions(next, '2026-09-28').find((o) => o.isBaseline)?.cycle.id).toBe('b')
   })
 })
 

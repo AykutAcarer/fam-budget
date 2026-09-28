@@ -141,6 +141,15 @@ export function cycleOptions<T extends CycleLike>(cycles: readonly T[], today: s
     }))
 }
 
+/**
+ * Baz ayı değiştirir (iyimser arayüz güncellemesi için): seçilen döngü baz ay,
+ * diğerlerinin hepsi değil — tek baz ay kuralı (sunucuda set_baseline_cycle ile aynı).
+ * Girdiyi değiştirmez.
+ */
+export function withBaseline<T extends CycleLike>(cycles: readonly T[], id: string): T[] {
+  return cycles.map((c) => ({ ...c, is_baseline: c.id === id }))
+}
+
 /** Varsayılan seçim: aktif döngü; yoksa bugünden önce başlayan en yeni; o da yoksa en yeni. */
 export function defaultCycleId(options: readonly CycleOption[], today: string): string | null {
   return (

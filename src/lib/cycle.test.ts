@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cycleDay, cycleLength, cycleWindowFor } from './cycle'
+import { cycleDay, cycleLength, cycleWindowFor, sameLabel } from './cycle'
 import { clampIsoDate } from './date'
 
 describe('cycleWindowFor', () => {
@@ -51,5 +51,12 @@ describe('clampIsoDate', () => {
   it('bozuk biçimi reddeder', () => {
     expect(() => clampIsoDate('2026-9-1')).toThrow()
     expect(() => clampIsoDate('2026-13-01')).toThrow()
+  })
+})
+
+describe('sameLabel', () => {
+  it('yalnız tire/boşluk farkı aynı sayılır', () => {
+    expect(sameLabel('15 Eyl - 14 Eki 2026', '15 Eyl – 14 Eki 2026')).toBe(true)
+    expect(sameLabel('Baz Ay (15 Ağu - 14 Eyl 2026)', '15 Ağu – 14 Eyl 2026')).toBe(false)
   })
 })
