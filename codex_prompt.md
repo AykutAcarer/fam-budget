@@ -45,16 +45,20 @@ kendi satırlarını okur/yazar.
 ### Varsayılan 10 kategori
 | key | label | type | color |
 |---|---|---|---|
-| mutfak | Mutfak / Market | zorunlu | #C6EFCE |
-| yakit | Yakıt | zorunlu | #FFD966 |
-| mensemax | MensaMax (okul yemeği) | zorunlu | #FF99CC |
-| kahvalti | Kahvaltı | kisilabilir | #FFF2CC |
-| is | İş / öğlen / atıştırmalık | kisilabilir | #F4B183 |
-| halisaha | Halı saha | kisilabilir | #9DC3E6 |
-| sosyal | Sosyal / diğer | kisilabilir | #D9D2E9 |
-| temizlik | Temizlik / Rossmann | yari | #CC99FF |
-| hanim | Hanıma verilen | yari | #99E6E6 |
-| kredi karti | Kredi kartı ödemesi | borc | #BFBFBF |
+| mutfak | Mutfak / Market | zorunlu | #22A06B |
+| yakit | Yakıt | zorunlu | #E47007 |
+| mensemax | MensaMax (okul yemeği) | zorunlu | #C026D3 |
+| kahvalti | Kahvaltı | kisilabilir | #B78C11 |
+| is | İş / öğlen / atıştırmalık | kisilabilir | #E23B3B |
+| halisaha | Halı saha | kisilabilir | #3E89DE |
+| sosyal | Sosyal / diğer | kisilabilir | #7C4DFF |
+| temizlik | Temizlik / Rossmann | yari | #17A2B8 |
+| hanim | Hanıma verilen | yari | #A1592B |
+| kredi karti | Kredi kartı ödemesi | borc | #6B7280 |
+
+Renkler erişilebilirlik doğrulamasından geçmiş paletten gelir: açık (#ffffff) ve koyu (#0f172a) zeminde
+≥ 3:1 kontrast; donut'ta komşu dilimler renk körlüğünde ΔE ≥ 8, normal görüşte ΔE ≥ 15 ayrışır. Tek kaynak:
+`supabase/functions/_shared/categories.ts` (veritabanı seed'i bunun aynasıdır; renk değişikliği orada yapılır).
 
 ## 5) Yapay zeka destekli sohbet girişi — MİMARİ
 ### 5.1 ALTIN KURAL: yapay zeka dili anlar, MATEMATİĞİ UYGULAMA yapar
