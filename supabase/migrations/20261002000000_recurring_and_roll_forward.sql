@@ -1,5 +1,5 @@
 -- =============================================================================
--- Tekrar eden kalemler + döngü devri
+-- Tekrar eden kalemler + döngü devri (roll_forward_cycle — dosyanın sonunda)
 --
 -- 1) fixed_expenses.recurring / income.recurring (varsayılan true): tek seferlik
 --    kalemler false işaretlenir; döngü devrinde yalnız recurring = true taşınır.
@@ -126,3 +126,123 @@ $$;
 
 revoke execute on function public.import_data(jsonb) from public, anon;
 grant execute on function public.import_data(jsonb) to authenticated;
+
+-- =============================================================================
+-- Döngü devri: roll_forward_cycle(kaynak) → sonraki döngü (id)
+--
+-- - Yeni döngü: başlangıç = kaynak.bitiş + 1 gün, bitiş = 1 ay sonrası − 1 gün
+--   (15 Eyl – 14 Eki → 15 Eki – 14 Kas). is_baseline = false (baz ay değişmez).
+-- - Sabit giderler (yalnız recurring): paid = false; installments_left NULL ise
+--   aynen, doluysa − 1; 1 ise (son taksit kaynak döngüdeydi) TAŞINMAZ. Kalem,
+--   tutar, kaynak (kart vb.) ve ayın günü korunur (ayda o gün yoksa ay sonu).
+-- - Gelir (yalnız recurring): received = false; kaynak, tutar, gün korunur.
+-- - Notlar taşınmaz (o aya özgüdür). Değişken harcamalar taşınmaz.
+-- - İdempotent: yeni başlangıç tarihini kapsayan döngü zaten varsa (önceden
+--   devredilmiş ya da içe aktarılmış) hiçbir şey kopyalanmaz, onun id'si döner.
+-- security invoker: RLS geçerli; kullanıcı yalnız kendi döngüsünü devredebilir.
+-- Eşleri: src/lib/fixed.ts (dateForDayInCycle), src/lib/cycle.ts (cycleLabel) —
+-- supabase/tests/roll-forward.test.ts ikisinin aynı sonucu verdiğini doğrular.
+-- =============================================================================
+
+-- Ayın gününü döngü içindeki tarihe yerleştirir (ayda yoksa ay sonuna çeker).
+create function public.day_in_cycle(p_start date, p_end date, p_day integer)
+returns date
+language sql
+immutable
+set search_path = ''
+as $$
+  select d
+    from (
+      select least(m + (p_day - 1), (m + interval '1 month' - interval '1 day')::date) as d, ord
+        from (values (date_trunc('month', p_start)::date, 1),
+                     ((date_trunc('month', p_start) + interval '1 month')::date, 2)) as t(m, ord)
+    ) c
+   where d between p_start and p_end
+   order by ord
+   limit 1
+$$;
+
+-- "15 Eki – 14 Kas 2026" / "15 Ara 2026 – 14 Oca 2027"
+create function public.cycle_label(p_start date, p_end date)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select extract(day from p_start)::int || ' '
+         || (array['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'])[extract(month from p_start)::int]
+         || case when extract(year from p_start) = extract(year from p_end) then '' else ' ' || extract(year from p_start)::int end
+         || ' – '
+         || extract(day from p_end)::int || ' '
+         || (array['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'])[extract(month from p_end)::int]
+         || ' ' || extract(year from p_end)::int
+$$;
+
+create function public.roll_forward_cycle(p_cycle_id uuid)
+returns uuid
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_src   public.cycles%rowtype;
+  v_start date;
+  v_end   date;
+  v_key   text;
+  v_new   uuid;
+begin
+  select * into v_src from public.cycles where id = p_cycle_id;
+  if not found then
+    raise exception 'Döngü bulunamadı' using errcode = 'P0002';
+  end if;
+
+  v_start := v_src.end_date + 1;
+  v_end   := (v_start + interval '1 month' - interval '1 day')::date;
+  v_key   := to_char(v_start, 'YYYY-MM');
+
+  -- İdempotent: bu tarihi kapsayan bir döngü zaten varsa dokunma.
+  select id into v_new
+    from public.cycles
+   where start_date <= v_start and end_date >= v_start
+   order by start_date desc
+   limit 1;
+  if found then
+    return v_new;
+  end if;
+
+  insert into public.cycles (key, label, start_date, end_date)
+  values (v_key, public.cycle_label(v_start, v_end), v_start, v_end)
+  on conflict (user_id, key) do nothing
+  returning id into v_new;
+
+  -- Aynı anda başka bir çağrı oluşturduysa kopyalama yapmadan onu döndür.
+  if v_new is null then
+    select id into v_new from public.cycles where key = v_key;
+    return v_new;
+  end if;
+
+  insert into public.fixed_expenses (cycle_id, date, item, amount, paid, source, installments_left, recurring)
+  select v_new,
+         coalesce(public.day_in_cycle(v_start, v_end, extract(day from f.date)::int), v_start),
+         f.item, f.amount, false, f.source,
+         case when f.installments_left is null then null else f.installments_left - 1 end,
+         true
+    from public.fixed_expenses f
+   where f.cycle_id = p_cycle_id
+     and f.recurring
+     and (f.installments_left is null or f.installments_left > 1);
+
+  insert into public.income (cycle_id, date, source, amount, received, recurring)
+  select v_new,
+         coalesce(public.day_in_cycle(v_start, v_end, extract(day from i.date)::int), v_start),
+         i.source, i.amount, false, true
+    from public.income i
+   where i.cycle_id = p_cycle_id
+     and i.recurring;
+
+  return v_new;
+end;
+$$;
+
+revoke execute on function public.roll_forward_cycle(uuid) from public, anon;
+grant execute on function public.roll_forward_cycle(uuid) to authenticated;

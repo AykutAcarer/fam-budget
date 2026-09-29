@@ -131,6 +131,8 @@ export interface Database {
       set_baseline_cycle: { Args: { p_cycle_id: string }; Returns: undefined }
       /** Normalleştirilmiş içe aktarma dosyası (bkz. src/lib/transfer.ts) → eklenen/güncellenen sayılar. */
       import_data: { Args: { p_data: unknown }; Returns: ImportSummary }
+      /** Kaynak döngüden sonraki döngüyü üretir (idempotent) → yeni döngünün id'si. */
+      roll_forward_cycle: { Args: { p_cycle_id: string }; Returns: string }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

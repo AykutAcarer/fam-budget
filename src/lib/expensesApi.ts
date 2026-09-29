@@ -3,6 +3,7 @@
  * alınır; harcama asla kaybolmaz.
  */
 import { cycleWindowFor } from './cycle'
+import { rollForwardUntil } from './cyclesApi'
 import type { VariableExpenseRow } from './database.types'
 import { addToOutbox, readOutbox, removeFromOutbox, type NewExpense } from './outbox'
 import { supabase } from './supabase'
@@ -14,7 +15,11 @@ export function isNetworkError(err: unknown): boolean {
   return /failed to fetch|network|load failed|fetch failed|timeout|aborted/i.test(msg)
 }
 
-/** Tarihi içeren döngünün id'si; yoksa maaş gününe göre oluşturulur. */
+/**
+ * Tarihi içeren döngünün id'si. Yoksa önce önceki döngüden DEVREDİLİR (tekrar
+ * eden gelir ve sabit giderler taşınır); hiç döngü yoksa maaş gününe göre boş
+ * döngü oluşturulur.
+ */
 export async function ensureCycleFor(date: string): Promise<string> {
   const found = await supabase
     .from('cycles')
@@ -26,6 +31,9 @@ export async function ensureCycleFor(date: string): Promise<string> {
     .maybeSingle()
   if (found.error) throw found.error
   if (found.data) return found.data.id
+
+  const rolled = await rollForwardUntil(date)
+  if (rolled) return rolled
 
   const w = cycleWindowFor(date)
   const inserted = await supabase

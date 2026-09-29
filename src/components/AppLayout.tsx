@@ -1,8 +1,14 @@
 /**
  * Oturum açılmış ekranların iskeleti: içerik + altta sabit tab bar.
+ * İçerik, açılıştaki döngü devri bittikten sonra gösterilir (useCycleRollover).
  */
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider'
+import { todayIso } from '../lib/cycle'
+import { useCycleRollover } from '../lib/useCycleRollover'
 import { CalendarIcon, CardIcon, ChartIcon, HomeIcon, SettingsIcon } from './icons'
+import { Spinner } from './ui'
 
 const TABS = [
   { to: '/', label: 'Ana Ekran', Icon: HomeIcon, end: true },
@@ -13,11 +19,15 @@ const TABS = [
 ]
 
 export function AppLayout() {
+  const { session } = useAuth()
+  const [today] = useState(todayIso)
+  const ready = useCycleRollover(session!.user.id, today)
+
   return (
     <div className="min-h-dvh">
       {/* Alt boşluk: tab bar + güvenli alan (iPhone çentiği). */}
       <main className="mx-auto max-w-2xl px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        <Outlet />
+        {ready ? <Outlet /> : <Spinner label="Döngü hazırlanıyor…" />}
       </main>
 
       <nav

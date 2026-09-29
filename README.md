@@ -13,6 +13,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
 - [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
 - [x] **Gelir girişi:** Sabit sekmesinde "Gelir" bölümü — toplam / alınan / beklenen, alındı anahtarı, ekle/düzenle/sil, tek seferlik işareti
+- [x] **Döngü devri:** her ayın 15'inde yeni döngü tekrar eden gelir ve sabit giderlerle otomatik başlar; taksitler bir azalır
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
@@ -33,7 +34,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20260929000000_import_data.sql` | JSON içe aktarma fonksiyonu |
      | `20260930000000_accessible_category_colors.sql` | Erişilebilir kategori renkleri + eski pastel renkleri taşıma |
      | `20261001000000_fixed_expense_installments.sql` | Sabit giderlere `installments_left` (kalan taksit) + içe aktarmanın bunu taşıması |
-     | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder) + içe aktarmanın bunu taşıması |
+     | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder), içe aktarmanın bunu taşıması ve döngü devri fonksiyonu `roll_forward_cycle` |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -192,6 +193,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 | RPC | Açıklama |
 |---|---|
 | `set_baseline_cycle(uuid)` | Baz ayı tek işlemde değiştirir. |
+| `roll_forward_cycle(uuid)` | Döngü devri — kaynak döngüden sonraki döngüyü tek işlemde üretir (bkz. *Döngü devri*). İdempotent. |
 | `import_data(jsonb)` | JSON içe aktarma — tek işlem (atomik), idempotent. Döngüler `key`'e göre upsert edilip kayıtları dosyadakilerle değiştirilir; borçlar ada göre eşlenir; kullanıcının mevcut kategorileri korunur. |
 
 **Güvenlik:**
@@ -266,6 +268,28 @@ kartı da aynı fonksiyonu kullanır). Şema değişikliği yoktur.
 - Bakiye Türkçe biçimde girilir ("6.026,31"); kısmi ödemeden sonra düzenle ile yeni bakiye yazılır. Ödeme geçmişi ve
   ödeme planı bu sürümde yok.
 
+## Döngü devri (otomatik yeni döngü)
+
+Her ayın 15'inde uygulama JSON içe aktarmaya gerek kalmadan yeni döngüye geçer:
+
+- **Ne zaman:** uygulama açılışında (ekranlar veriyi yüklemeden önce), bugünü kapsayan döngü yoksa ve bugün en yeni döngünün
+  bitişinden sonraysa. Sohbetten harcama girilirken ya da çevrimdışı kuyruk gönderilirken döngü yoksa da aynı devir
+  kullanılır; boş döngü yalnızca hiç döngüsü olmayan yeni kullanıcı için oluşturulur. Uzun süre girilmediyse aradaki
+  döngüler sırayla üretilir (taksitler her döngüde bir azalır). Çevrimdışıyken beklenmez; ilk bağlantıda yapılır.
+- **Ne taşınır** (`roll_forward_cycle`, tek işlem): yalnızca "Her ay tekrar eder" işaretli gelir ve sabit giderler —
+  "alınmadı / ödenmedi" olarak; kalem, tutar, kaynak (kart vb.) ve ayın günü korunur (ayda o gün yoksa ay sonu: 31 → 30 Kas).
+  Kalan taksit bir azalır; 1 ise (son taksit önceki döngüdeydi) kalem taşınmaz. Notlar (o aya özgü) ve değişken harcamalar
+  taşınmaz. Baz ay değişmez.
+- **İdempotent:** yeni döngünün başlangıç tarihini kapsayan döngü zaten varsa (önceden devredilmiş ya da içe aktarılmış)
+  hiçbir şey kopyalanmaz.
+- Karar fonksiyonları [`src/lib/rollForward.ts`](src/lib/rollForward.ts); kopyalama kuralları SQL'de; testler
+  `supabase/tests/roll-forward.test.ts` (SQL ↔ TypeScript eşleri dahil).
+
+**15'ini beklemeden deneme:** yeni bir test hesabı aç → *Ayarlar > Veriyi içe aktar* ile
+[`ornek_devir_testi.json`](ornek_devir_testi.json) (yalnız Ağustos döngüsü; "Araç sigortası" tek seferlik) → sayfayı yenile.
+Eylül döngüsü (15 Eyl – 14 Eki) kendiliğinden oluşmalı: tekrar eden kalemler ödenmedi / alınmadı, Araç sigortası yok,
+Beyaz eşya taksiti "6 taksit kaldı".
+
 ## Döngü mantığı
 
 Döngü takvim ayı değildir: her ayın **15'inde** başlar, ertesi ayın **14'ünde** biter. Döngü günü 1 = 15'i.
@@ -292,6 +316,7 @@ src/
     transfer.ts               içe aktarma doğrulama / dışa aktarma (saf)
     fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase
     income.ts, incomeApi.ts   gelir: toplamlar (alınan/beklenen), form (saf, testli) + Supabase
+    rollForward.ts            döngü devri kararı (saf, testli); useCycleRollover açılışta çalıştırır
     debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...

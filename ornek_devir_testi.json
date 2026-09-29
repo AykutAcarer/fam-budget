@@ -1,0 +1,524 @@
+{
+  "meta": {
+    "currency": "EUR",
+    "locale": "de-DE",
+    "owner": "ornek-aile",
+    "generatedAt": "2026-09-28",
+    "cycleModel": "payday-anchored",
+    "cycleNote": "Döngü her ayın 15'inde (maaş günü) başlar, ertesi ayın 14'ünde biter.",
+    "note": "Devir testi: yalnız Ağustos döngüsü. Yeni bir test hesabına içe aktar, sayfayı yenile; Eylül döngüsü otomatik oluşmalı."
+  },
+  "categories": [
+    {
+      "key": "mutfak",
+      "label": "Mutfak / Market",
+      "type": "zorunlu",
+      "color": "#22A06B"
+    },
+    {
+      "key": "yakit",
+      "label": "Yakıt",
+      "type": "zorunlu",
+      "color": "#E47007"
+    },
+    {
+      "key": "mensemax",
+      "label": "MensaMax (okul yemeği)",
+      "type": "zorunlu",
+      "color": "#C026D3"
+    },
+    {
+      "key": "kahvalti",
+      "label": "Kahvaltı",
+      "type": "kisilabilir",
+      "color": "#B78C11"
+    },
+    {
+      "key": "is",
+      "label": "İş / öğlen / atıştırmalık",
+      "type": "kisilabilir",
+      "color": "#E23B3B"
+    },
+    {
+      "key": "halisaha",
+      "label": "Halı saha",
+      "type": "kisilabilir",
+      "color": "#3E89DE"
+    },
+    {
+      "key": "sosyal",
+      "label": "Sosyal / diğer",
+      "type": "kisilabilir",
+      "color": "#7C4DFF"
+    },
+    {
+      "key": "temizlik",
+      "label": "Temizlik / Rossmann",
+      "type": "yari",
+      "color": "#17A2B8"
+    },
+    {
+      "key": "hanim",
+      "label": "Hanıma verilen",
+      "type": "yari",
+      "color": "#A1592B"
+    },
+    {
+      "key": "kredi karti",
+      "label": "Kredi kartı ödemesi",
+      "type": "borc",
+      "color": "#6B7280"
+    }
+  ],
+  "debts": [
+    {
+      "name": "Kredi Kartı",
+      "balance": 2480.5,
+      "interest": "~%18/yıl",
+      "hasInterest": true,
+      "dueDate": null,
+      "priority": 1,
+      "note": "En pahalı borç"
+    },
+    {
+      "name": "Ev sahibi (yan gider farkı)",
+      "balance": 420,
+      "interest": null,
+      "hasInterest": false,
+      "dueDate": "2027-01",
+      "priority": 2
+    },
+    {
+      "name": "Arkadaş borcu",
+      "balance": 750,
+      "interest": null,
+      "hasInterest": false,
+      "dueDate": null,
+      "priority": 3
+    },
+    {
+      "name": "Aile büyüğü",
+      "balance": 1200,
+      "interest": null,
+      "hasInterest": false,
+      "dueDate": null,
+      "priority": 4
+    }
+  ],
+  "cycles": [
+    {
+      "id": "2026-08",
+      "label": "Baz Ay (15 Ağu - 14 Eyl 2026)",
+      "start": "2026-08-15",
+      "end": "2026-09-14",
+      "isBaseline": true,
+      "income": [
+        {
+          "date": "2026-08-15",
+          "source": "Maaş",
+          "amount": 2250,
+          "received": true
+        },
+        {
+          "date": "2026-09-07",
+          "source": "Çocuk yardımı",
+          "amount": 255,
+          "received": true
+        },
+        {
+          "date": "2026-08-30",
+          "source": "Kira yardımı",
+          "amount": 0,
+          "received": false,
+          "note": "Bu ay gecikti (normalde 180)"
+        }
+      ],
+      "fixed": [
+        {
+          "date": "2026-08-15",
+          "item": "Kira",
+          "amount": 850,
+          "paid": true
+        },
+        {
+          "date": "2026-08-20",
+          "item": "Elektrik",
+          "amount": 72.5,
+          "paid": true
+        },
+        {
+          "date": "2026-08-25",
+          "item": "Araç sigortası",
+          "amount": 48.9,
+          "paid": true,
+          "recurring": false
+        },
+        {
+          "date": "2026-08-31",
+          "item": "Beyaz eşya taksiti",
+          "amount": 39.99,
+          "note": "Her ayın son günü",
+          "paid": true,
+          "installmentsLeft": 7
+        },
+        {
+          "date": "2026-09-01",
+          "item": "İnternet",
+          "amount": 34.99,
+          "paid": true
+        },
+        {
+          "date": "2026-09-05",
+          "item": "Telefon",
+          "amount": 19.99,
+          "source": "Kredi kartı",
+          "paid": true
+        },
+        {
+          "date": "2026-09-10",
+          "item": "Spor kulübü (çocuk)",
+          "amount": 25,
+          "paid": true
+        }
+      ],
+      "variable": [
+        {
+          "date": "2026-08-15",
+          "category": "sosyal",
+          "description": "Dondurma",
+          "amount": 15.55
+        },
+        {
+          "date": "2026-08-15",
+          "category": "mutfak",
+          "description": "Market alışverişi",
+          "amount": 35.66
+        },
+        {
+          "date": "2026-08-15",
+          "category": "temizlik",
+          "description": "Rossmann",
+          "amount": 6.3
+        },
+        {
+          "date": "2026-08-17",
+          "category": "is",
+          "description": "İşte öğle yemeği",
+          "amount": 3.41
+        },
+        {
+          "date": "2026-08-18",
+          "category": "kahvalti",
+          "description": "Poğaça + çay",
+          "amount": 5.31
+        },
+        {
+          "date": "2026-08-18",
+          "category": "sosyal",
+          "description": "Park kafe",
+          "amount": 13.34
+        },
+        {
+          "date": "2026-08-18",
+          "category": "mutfak",
+          "description": "Market alışverişi",
+          "amount": 43.25
+        },
+        {
+          "date": "2026-08-18",
+          "category": "mensemax",
+          "description": "Okul yemeği yüklemesi",
+          "amount": 45
+        },
+        {
+          "date": "2026-08-19",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 4.13
+        },
+        {
+          "date": "2026-08-19",
+          "category": "halisaha",
+          "description": "Halı saha",
+          "amount": 8.25
+        },
+        {
+          "date": "2026-08-20",
+          "category": "kahvalti",
+          "description": "Poğaça + çay",
+          "amount": 3.68
+        },
+        {
+          "date": "2026-08-20",
+          "category": "is",
+          "description": "Molada atıştırmalık",
+          "amount": 6.36
+        },
+        {
+          "date": "2026-08-21",
+          "category": "kahvalti",
+          "description": "Poğaça + çay",
+          "amount": 3.3
+        },
+        {
+          "date": "2026-08-22",
+          "category": "sosyal",
+          "description": "Döner",
+          "amount": 6.59
+        },
+        {
+          "date": "2026-08-22",
+          "category": "mutfak",
+          "description": "Kasap",
+          "amount": 22.84
+        },
+        {
+          "date": "2026-08-24",
+          "category": "kahvalti",
+          "description": "Poğaça + çay",
+          "amount": 3
+        },
+        {
+          "date": "2026-08-24",
+          "category": "yakit",
+          "description": "Benzin",
+          "amount": 45
+        },
+        {
+          "date": "2026-08-25",
+          "category": "kredi karti",
+          "description": "Kredi kartı ödemesi",
+          "amount": 150
+        },
+        {
+          "date": "2026-08-26",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 5.46
+        },
+        {
+          "date": "2026-08-26",
+          "category": "is",
+          "description": "Molada atıştırmalık",
+          "amount": 5.3
+        },
+        {
+          "date": "2026-08-26",
+          "category": "halisaha",
+          "description": "Halı saha",
+          "amount": 8.25
+        },
+        {
+          "date": "2026-08-26",
+          "category": "sosyal",
+          "description": "Dondurma",
+          "amount": 20.51
+        },
+        {
+          "date": "2026-08-27",
+          "category": "kahvalti",
+          "description": "Poğaça + çay",
+          "amount": 3.82
+        },
+        {
+          "date": "2026-08-28",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 2.24
+        },
+        {
+          "date": "2026-08-29",
+          "category": "mutfak",
+          "description": "Manav",
+          "amount": 46.37
+        },
+        {
+          "date": "2026-08-31",
+          "category": "is",
+          "description": "Molada atıştırmalık",
+          "amount": 2.66
+        },
+        {
+          "date": "2026-08-31",
+          "category": "sosyal",
+          "description": "Sinema",
+          "amount": 14.04
+        },
+        {
+          "date": "2026-09-01",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 4.46
+        },
+        {
+          "date": "2026-09-01",
+          "category": "is",
+          "description": "Kahve",
+          "amount": 5.49
+        },
+        {
+          "date": "2026-09-01",
+          "category": "temizlik",
+          "description": "Deterjan",
+          "amount": 8.34
+        },
+        {
+          "date": "2026-09-02",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 3.04
+        },
+        {
+          "date": "2026-09-02",
+          "category": "halisaha",
+          "description": "Halı saha",
+          "amount": 8.25
+        },
+        {
+          "date": "2026-09-02",
+          "category": "mutfak",
+          "description": "Kasap",
+          "amount": 52.38
+        },
+        {
+          "date": "2026-09-03",
+          "category": "kahvalti",
+          "description": "Kahvaltılık börek",
+          "amount": 5.44
+        },
+        {
+          "date": "2026-09-03",
+          "category": "mutfak",
+          "description": "Manav",
+          "amount": 46.95
+        },
+        {
+          "date": "2026-09-04",
+          "category": "kahvalti",
+          "description": "Kahvaltılık börek",
+          "amount": 3.68
+        },
+        {
+          "date": "2026-09-04",
+          "category": "is",
+          "description": "Kahve",
+          "amount": 6.21
+        },
+        {
+          "date": "2026-09-04",
+          "category": "sosyal",
+          "description": "Sinema",
+          "amount": 15.79
+        },
+        {
+          "date": "2026-09-04",
+          "category": "mutfak",
+          "description": "Market alışverişi",
+          "amount": 23.07
+        },
+        {
+          "date": "2026-09-05",
+          "category": "mutfak",
+          "description": "Manav",
+          "amount": 63.82
+        },
+        {
+          "date": "2026-09-07",
+          "category": "is",
+          "description": "Kahve",
+          "amount": 7.37
+        },
+        {
+          "date": "2026-09-07",
+          "category": "yakit",
+          "description": "Benzin",
+          "amount": 45.13
+        },
+        {
+          "date": "2026-09-08",
+          "category": "kahvalti",
+          "description": "Kahvaltılık börek",
+          "amount": 4.33
+        },
+        {
+          "date": "2026-09-08",
+          "category": "sosyal",
+          "description": "Oyuncak",
+          "amount": 12.53
+        },
+        {
+          "date": "2026-09-09",
+          "category": "kahvalti",
+          "description": "Kahvaltılık börek",
+          "amount": 3.1
+        },
+        {
+          "date": "2026-09-09",
+          "category": "halisaha",
+          "description": "Halı saha",
+          "amount": 8.25
+        },
+        {
+          "date": "2026-09-10",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 4.5
+        },
+        {
+          "date": "2026-09-10",
+          "category": "is",
+          "description": "Kahve",
+          "amount": 2.84
+        },
+        {
+          "date": "2026-09-11",
+          "category": "kahvalti",
+          "description": "Simit",
+          "amount": 2.59
+        },
+        {
+          "date": "2026-09-11",
+          "category": "is",
+          "description": "Kahve",
+          "amount": 8.54
+        },
+        {
+          "date": "2026-09-11",
+          "category": "sosyal",
+          "description": "Dondurma",
+          "amount": 20.33
+        },
+        {
+          "date": "2026-09-12",
+          "category": "sosyal",
+          "description": "Oyuncak",
+          "amount": 21.39
+        },
+        {
+          "date": "2026-09-12",
+          "category": "mutfak",
+          "description": "Kasap",
+          "amount": 58.3
+        },
+        {
+          "date": "2026-09-14",
+          "category": "kahvalti",
+          "description": "Kahvaltılık börek",
+          "amount": 3.67
+        },
+        {
+          "date": "2026-09-14",
+          "category": "sosyal",
+          "description": "Sinema",
+          "amount": 15.91
+        },
+        {
+          "date": "2026-09-14",
+          "category": "yakit",
+          "description": "Benzin",
+          "amount": 49.32
+        }
+      ]
+    }
+  ]
+}
