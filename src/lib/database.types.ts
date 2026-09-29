@@ -96,6 +96,17 @@ export type DebtRow = {
   created_at: string
 }
 
+/** Borca yapılan ödeme. Eklenince/silinince/düzenlenince borcun bakiyesi tetikleyiciyle güncellenir. */
+export type DebtPaymentRow = {
+  id: string
+  user_id: string
+  debt_id: string
+  date: string
+  amount: number
+  note: string | null
+  created_at: string
+}
+
 /** import_data RPC'sinin döndürdüğü sayılar. */
 export type ImportSummary = {
   categories: number
@@ -127,6 +138,7 @@ export interface Database {
         'name' | 'balance',
         Generated | 'interest' | 'has_interest' | 'due_date' | 'priority' | 'note'
       >
+      debt_payments: Table<DebtPaymentRow, 'debt_id' | 'date' | 'amount', Generated | 'note'>
     }
     Views: { [_ in never]: never }
     Functions: {

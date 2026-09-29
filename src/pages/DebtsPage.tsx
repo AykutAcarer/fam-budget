@@ -6,11 +6,13 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
 import { useMemo, useState } from 'react'
 import { DebtForm } from '../components/debts/DebtForm'
+import { DebtPayments } from '../components/debts/DebtPayments'
 import { useDebts } from '../components/debts/useDebts'
 import { AlertIcon, CalendarIcon, ClockIcon, PlusIcon } from '../components/icons'
 import { Card, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
-import type { DebtRow } from '../lib/database.types'
+import type { DebtPaymentRow, DebtRow } from '../lib/database.types'
+import { paymentsByDebt } from '../lib/debtPayments'
 import { debtTotals, dueStatus, nextPriority, sortDebts, type DueStatus } from '../lib/debts'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
@@ -39,19 +41,30 @@ function DueBadge({ status }: { status: DueStatus }) {
   return null
 }
 
-function DebtCard({ debt, payFirst, today, onEdit }: { debt: DebtRow; payFirst: boolean; today: string; onEdit: () => void }) {
+interface CardProps {
+  debt: DebtRow
+  payFirst: boolean
+  today: string
+  paid: { count: number; total: number }
+  onEdit: () => void
+  onPayments: () => void
+}
+
+function DebtCard({ debt, payFirst, today, paid, onEdit, onPayments }: CardProps) {
   const due = dueStatus(debt.due_date, today)
   return (
-    <li>
+    <li
+      className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 dark:bg-slate-900 ${
+        debt.has_interest
+          ? 'border-l-4 border-red-500 ring-red-500/25 dark:border-red-400 dark:ring-red-400/25'
+          : 'ring-slate-900/5 dark:ring-white/10'
+      }`}
+    >
       <button
         type="button"
         onClick={onEdit}
         aria-label={`${debt.name}, öncelik ${debt.priority}, ${formatEur(debt.balance)} — düzenle`}
-        className={`block w-full rounded-2xl bg-white p-4 text-left shadow-sm ring-1 transition-colors hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70 ${
-          debt.has_interest
-            ? 'border-l-4 border-red-500 ring-red-500/25 dark:border-red-400 dark:ring-red-400/25'
-            : 'ring-slate-900/5 dark:ring-white/10'
-        }`}
+        className="block w-full p-4 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/70"
       >
         <div className="flex items-start gap-3">
           <span
@@ -93,14 +106,29 @@ function DebtCard({ debt, payFirst, today, onEdit }: { debt: DebtRow; payFirst: 
           </p>
         </div>
       </button>
+      <button
+        type="button"
+        onClick={onPayments}
+        aria-label={`${debt.name} — ödemeler`}
+        className="flex min-h-11 w-full items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-sm transition-colors hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70"
+      >
+        <span className="font-semibold text-emerald-700 dark:text-emerald-400">{debt.balance > 0 ? 'Ödeme ekle · geçmiş' : 'Ödeme geçmişi'}</span>
+        <span className="text-xs text-slate-500 tabular-nums dark:text-slate-400">
+          {paid.count > 0 ? `${paid.count} ödeme · ${formatEur(paid.total)} ödendi` : 'henüz ödeme yok'}
+        </span>
+      </button>
     </li>
   )
 }
 
 export function DebtsPage() {
   const [today] = useState(todayIso)
-  const { debts, loadError, save, remove } = useDebts()
+  const { debts, payments, loadError, save, remove, savePayment, removePayment } = useDebts()
   const [editing, setEditing] = useState<{ row: DebtRow | null } | null>(null)
+  const [paying, setPaying] = useState<string | null>(null)
+  const byDebt = useMemo(() => paymentsByDebt(payments), [payments])
+  const noPayments: DebtPaymentRow[] = []
+  const payingDebt = paying ? debts?.find((d) => d.id === paying) : undefined
 
   const sorted = useMemo(() => (debts ? sortDebts(debts) : []), [debts])
   const totals = useMemo(() => debtTotals(sorted), [sorted])
@@ -166,9 +194,28 @@ export function DebtsPage() {
       ) : (
         <ul className="space-y-3">
           {sorted.map((d) => (
-            <DebtCard key={d.id} debt={d} payFirst={d.id === payFirstId} today={today} onEdit={() => setEditing({ row: d })} />
+            <DebtCard
+              key={d.id}
+              debt={d}
+              payFirst={d.id === payFirstId}
+              today={today}
+              paid={{ count: byDebt.get(d.id)?.list.length ?? 0, total: byDebt.get(d.id)?.total ?? 0 }}
+              onEdit={() => setEditing({ row: d })}
+              onPayments={() => setPaying(d.id)}
+            />
           ))}
         </ul>
+      )}
+
+      {payingDebt && (
+        <DebtPayments
+          debt={payingDebt}
+          payments={byDebt.get(payingDebt.id)?.list ?? noPayments}
+          today={today}
+          onClose={() => setPaying(null)}
+          onSave={savePayment}
+          onDelete={removePayment}
+        />
       )}
 
       {editing && (

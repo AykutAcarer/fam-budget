@@ -126,7 +126,7 @@ export function DebtForm({ existing, suggestedPriority, onClose, onSave, onDelet
           </label>
         </div>
         {err('priority')}
-        {existing && <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">Kısmi ödeme yaptıysan kalan bakiyeyi yaz.</p>}
+        {existing && <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">Ödeme yaptıysan kartın altındaki “Ödeme ekle”yi kullan — bakiye düşer ve geçmişte görünür. Burayı yalnız düzeltme için değiştir.</p>}
 
         <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
           <input type="checkbox" checked={input.hasInterest} onChange={(e) => set('hasInterest', e.target.checked)} className="size-5 rounded accent-emerald-600" />

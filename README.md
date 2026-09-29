@@ -15,6 +15,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Gelir girişi:** Sabit sekmesinde "Gelir" bölümü — toplam / alınan / beklenen, alındı anahtarı, ekle/düzenle/sil, tek seferlik işareti
 - [x] **Döngü devri:** her ayın 15'inde yeni döngü tekrar eden gelir ve sabit giderlerle otomatik başlar; taksitler bir azalır
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
+- [x] **Borç ödeme geçmişi:** ödeme ekle (tarih, tutar, not) → bakiye aynı işlemde düşer; geçmiş + toplam ödenen; düzenle/sil bakiyeyi düzeltir
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
 - [x] **Ayarlar > Kategoriler:** ekle / düzenle (ad, tür, erişilebilir renk, anahtar kelimeler), harcamaları taşıyıp silme; yedek parser kullanıcının anahtar kelimelerini kullanır
@@ -36,6 +37,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20261001000000_fixed_expense_installments.sql` | Sabit giderlere `installments_left` (kalan taksit) + içe aktarmanın bunu taşıması |
      | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder), içe aktarmanın bunu taşıması ve döngü devri fonksiyonu `roll_forward_cycle` |
      | `20261003000000_category_management.sql` | Kategorilere `keywords` (yedek parser anahtar kelimeleri; mevcut varsayılan kategorilere de yazılır), taşı-sil fonksiyonu `delete_category`, içe aktarmada `keywords` |
+     | `20261004000000_debt_payments.sql` | Borç ödeme geçmişi tablosu `debt_payments` (RLS) + bakiyeyi aynı işlemde güncelleyen tetikleyici |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -190,6 +192,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
 | `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.installments_left`: kalan taksit (taksit değilse NULL). |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
+| `debt_payments` | Borç ödemeleri (`debt_id`, `date`, `amount`, `note`). Borca `(debt_id, user_id)` bileşik FK ile bağlı; borç silinince silinir. Ekle / sil / tutar düzenle, tetikleyiciyle borcun `balance`'ını aynı işlemde günceller; kalan bakiyeden büyük ödeme reddedilir. |
 
 | RPC | Açıklama |
 |---|---|
@@ -276,15 +279,20 @@ Gün girildiğinde döngü içindeki tarihe yerleşir (15 Eyl – 14 Eki döngü
 ## Borçlar
 
 *Borçlar* sekmesi toplamları ve sıralamayı [`src/lib/debts.ts`](src/lib/debts.ts)'ten alır (dashboard'daki "Toplam borç"
-kartı da aynı fonksiyonu kullanır). Şema değişikliği yoktur.
+kartı da aynı fonksiyonu kullanır).
 
 - **Sıralama:** faizliler önce, faiz metninden okunan orana göre yüksekten düşüğe ("~%17,5/yıl" → 17,5; okunamazsa sona);
   sonra faizsizler öncelik numarasına göre. Eşitlikte öncelik, sonra yüksek bakiye, sonra ad.
 - **"Önce bunu öde":** listede en üstteki (en pahalı) kapanmamış faizli borç. Tüm faizliler kırmızı vurgulanır.
 - **Vade:** `YYYY-MM-DD` ya da yalnız ay (`YYYY-MM`, hesapta ayın ilk günü sayılır). Bugünden 0–30 gün içindeyse
   "vade yaklaşıyor", geçmişse "vadesi geçti".
-- Bakiye Türkçe biçimde girilir ("6.026,31"); kısmi ödemeden sonra düzenle ile yeni bakiye yazılır. Ödeme geçmişi ve
-  ödeme planı bu sürümde yok.
+- Bakiye Türkçe biçimde girilir ("6.026,31").
+- **Ödeme geçmişi:** kartın altındaki "Ödeme ekle · geçmiş" → tarih (gelecek olamaz), tutar, not. Kayıt ve bakiye düşüşü
+  veritabanında tek işlemdir (`debt_payments` tetikleyicisi); ödeme kalan bakiyeden büyük olamaz, formda "ödeme sonrası
+  kalan" önizlemesi gösterilir. Geçmiş en yeni önce listelenir, toplam ödenen gösterilir. Ödemeyi silmek tutarı bakiyeye
+  geri ekler; tutarı düzenlemek farkı yansıtır. Tutarlar sent cinsinden hesaplanır
+  ([`debtPayments.ts`](src/lib/debtPayments.ts)); testler `supabase/tests/debt-payments.test.ts`.
+  Borç formunda bakiyeyi elle değiştirmek hâlâ mümkündür (düzeltme için). Ödeme geçmişi JSON dışa aktarmaya dahil değildir.
 
 ## Döngü devri (otomatik yeni döngü)
 
@@ -338,6 +346,7 @@ src/
     income.ts, incomeApi.ts   gelir: toplamlar (alınan/beklenen), form (saf, testli) + Supabase
     rollForward.ts            döngü devri kararı (saf, testli); useCycleRollover açılışta çalıştırır
     debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
+    debtPayments.ts, debtPaymentsApi.ts  borç ödemeleri: toplam, sınır, form (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...
 pwa.config.ts               PWA manifest + service worker ayarları
