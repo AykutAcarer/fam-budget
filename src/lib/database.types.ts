@@ -107,6 +107,17 @@ export type DebtPaymentRow = {
   created_at: string
 }
 
+/** Sohbet mesajı. id istemcide üretilir (çevrimdışı kuyruktan upsert, kopya olmaz). */
+export type ChatMessageRow = {
+  id: string
+  user_id: string
+  role: 'user' | 'assistant'
+  content: string
+  meta: Record<string, unknown>
+  related_expense_id: string | null
+  created_at: string
+}
+
 /** import_data RPC'sinin döndürdüğü sayılar. */
 export type ImportSummary = {
   categories: number
@@ -139,6 +150,7 @@ export interface Database {
         Generated | 'interest' | 'has_interest' | 'due_date' | 'priority' | 'note'
       >
       debt_payments: Table<DebtPaymentRow, 'debt_id' | 'date' | 'amount', Generated | 'note'>
+      chat_messages: Table<ChatMessageRow, 'id' | 'role' | 'content', 'user_id' | 'created_at' | 'meta' | 'related_expense_id'>
     }
     Views: { [_ in never]: never }
     Functions: {

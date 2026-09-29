@@ -1,50 +1,46 @@
 /**
  * Sohbet durumu (mesajlar, onay bekleyen kalemler, çevrimdışı kuyruk).
  * Akışın kendisi src/lib/chatFlow.ts'te (React'ten bağımsız, testli).
+ *
+ * Geçmiş veritabanında (chat_messages) — cihazlar arası. Her yeni ya da değişen
+ * mesaj önce cihazdaki gönderim kuyruğuna yazılır, sonra upsert edilir; bağlantı
+ * yoksa kuyrukta bekler ve bağlantı gelince (kopya olmadan) gönderilir.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_CATEGORIES } from '../../../supabase/functions/_shared/categories'
 import type { BudgetData } from '../../lib/budget'
 import { parseWithAI, replyWithAI } from '../../lib/chatApi'
 import { interpret, saveAndRespond, type FlowDeps, type FlowEnv, type ItemSource, type PendingConfirm } from '../../lib/chatFlow'
-import type { SavedItem } from '../../lib/chatText'
+import {
+  changedMessages,
+  enqueueMessages,
+  mergeMessages,
+  migrateLegacyHistory,
+  nextAt,
+  readChatQueue,
+  syncChatQueue,
+  type BotMessage,
+  type ChatMessage,
+  type KeyValueStore,
+} from '../../lib/chatHistory'
+import { loadMessages, upsertMessages } from '../../lib/chatHistoryApi'
 import { deleteExpenses, flushOutbox, isNetworkError, saveExpenses } from '../../lib/expensesApi'
 import { readOutbox, type NewExpense } from '../../lib/outbox'
 
 export type { PendingConfirm }
+export type { BotExpense, ChatMessage } from '../../lib/chatHistory'
 
-export interface BotExpense extends SavedItem {
-  id: string
-  undone?: boolean
-}
+type BotFields = Omit<BotMessage, 'id' | 'at' | 'role'>
 
-export type ChatMessage =
-  | { id: string; role: 'user'; text: string; at: number }
-  | {
-      id: string
-      role: 'bot'
-      text: string
-      at: number
-      tone?: 'info' | 'error'
-      expenses?: BotExpense[]
-      /** Cihazda bekliyor (henüz sunucuda değil). */
-      queued?: boolean
-      /** Cevabı kim yazdı: yapay zeka mı, kod mu? */
-      author?: 'ai' | 'kod'
-    }
-
-type BotFields = Omit<Extract<ChatMessage, { role: 'bot' }>, 'id' | 'at' | 'role'>
-
-const MAX_STORED = 50
-const storageKey = (userId: string) => `butcem:chat:${userId}`
-
-function loadMessages(userId: string): ChatMessage[] {
+/** localStorage erişimi bazı ortamlarda hata fırlatır; o durumda bellek içi depo. */
+function browserStore(): KeyValueStore {
   try {
-    const raw = localStorage.getItem(storageKey(userId))
-    const list: unknown = raw ? JSON.parse(raw) : []
-    return Array.isArray(list) ? (list as ChatMessage[]) : []
+    const ls = window.localStorage
+    ls.getItem('butcem:probe')
+    return ls
   } catch {
-    return []
+    const mem = new Map<string, string>()
+    return { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => void mem.set(k, v), removeItem: (k) => void mem.delete(k) }
   }
 }
 
@@ -59,19 +55,97 @@ export function useChat(params: {
   reload: () => Promise<BudgetData | null>
 }) {
   const { userId, today, data, reload } = params
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(userId))
+  const store = useMemo(browserStore, [])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    migrateLegacyHistory(store, userId)
+    return readChatQueue(store, userId)
+  })
+  const messagesRef = useRef(messages)
+  const [history, setHistory] = useState({ loading: true, hasMore: false, error: false })
+  /** Gönderilemeyen (son denemesi başarısız) mesaj sayısı; gönderim sürerken 0 kalır. */
+  const [chatQueue, setChatQueue] = useState(0)
   const [pending, setPending] = useState<PendingConfirm | null>(null)
   const [busy, setBusy] = useState(false)
   const [outbox, setOutbox] = useState<NewExpense[]>(() => readOutbox(userId))
 
-  // Kalıcı sohbet geçmişi (cihaza özel).
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey(userId), JSON.stringify(messages.slice(-MAX_STORED)))
-    } catch {
-      // Depolama kapalıysa geçmiş yalnızca bu oturumda kalır.
+  // Kuyruktaki mesajları gönder (aynı anda tek gönderim; arada gelen değişiklik bir tur daha).
+  const syncState = useRef({ running: false, again: false })
+  const syncChat = useCallback(async () => {
+    const st = syncState.current
+    if (st.running) {
+      st.again = true
+      return
     }
-  }, [messages, userId])
+    st.running = true
+    let failed = false
+    try {
+      do {
+        st.again = false
+        try {
+          await syncChatQueue(store, userId, upsertMessages)
+        } catch {
+          // Bağlantı yok; bağlantı gelince tekrar denenir.
+          failed = true
+          break
+        }
+      } while (st.again)
+    } finally {
+      st.running = false
+      setChatQueue(failed ? readChatQueue(store, userId).length : 0)
+    }
+  }, [store, userId])
+
+  /** Mesaj listesini günceller; yeni / değişen mesajlar kuyruğa girer ve gönderilir. */
+  const apply = useCallback(
+    (update: (list: ChatMessage[]) => ChatMessage[]) => {
+      const before = messagesRef.current
+      const after = update(before)
+      messagesRef.current = after
+      setMessages(after)
+      const changed = changedMessages(before, after)
+      if (changed.length) {
+        enqueueMessages(store, userId, changed)
+        void syncChat()
+      }
+    },
+    [store, userId, syncChat],
+  )
+
+  // Açılışta: son mesajlar sunucudan (kuyruktakilerle birleşik) + bekleyenleri gönder.
+  useEffect(() => {
+    let alive = true
+    void syncChat()
+    loadMessages()
+      .then(({ messages: server, hasMore }) => {
+        if (!alive) return
+        const merged = mergeMessages(server, messagesRef.current, readChatQueue(store, userId))
+        messagesRef.current = merged
+        setMessages(merged)
+        setHistory({ loading: false, hasMore, error: false })
+      })
+      .catch(() => alive && setHistory({ loading: false, hasMore: false, error: true }))
+    window.addEventListener('online', syncChat)
+    return () => {
+      alive = false
+      window.removeEventListener('online', syncChat)
+    }
+  }, [store, userId, syncChat])
+
+  /** Daha eski mesajları yükler. */
+  const loadOlder = useCallback(async () => {
+    const oldest = messagesRef.current[0]
+    if (!oldest) return
+    setHistory((h) => ({ ...h, loading: true }))
+    try {
+      const { messages: older, hasMore } = await loadMessages(oldest)
+      const merged = mergeMessages(older, messagesRef.current)
+      messagesRef.current = merged
+      setMessages(merged)
+      setHistory({ loading: false, hasMore, error: false })
+    } catch {
+      setHistory((h) => ({ ...h, loading: false, error: true }))
+    }
+  }, [])
 
   const categories = useMemo(
     () =>
@@ -85,9 +159,10 @@ export function useChat(params: {
   const dataRef = useRef(data)
   dataRef.current = data
 
-  const push = useCallback((fields: BotFields) => {
-    setMessages((m) => [...m, { id: newId(), at: Date.now(), role: 'bot', ...fields }])
-  }, [])
+  const push = useCallback(
+    (fields: BotFields) => apply((m) => [...m, { id: newId(), at: nextAt(m, Date.now()), role: 'bot', ...fields }]),
+    [apply],
+  )
 
   const env = useCallback(
     (): FlowEnv => ({
@@ -122,13 +197,13 @@ export function useChat(params: {
       const sent = await flushOutbox(userId)
       setOutbox(readOutbox(userId))
       if (sent) {
-        setMessages((m) => m.map((x) => (x.role === 'bot' && x.queued ? { ...x, queued: false } : x)))
+        apply((m) => m.map((x) => (x.role === 'bot' && x.queued ? { ...x, queued: false } : x)))
         await reload()
       }
     } catch {
       // Hâlâ çevrimdışı; bir sonraki fırsatta tekrar denenecek.
     }
-  }, [userId, reload])
+  }, [userId, reload, apply])
 
   useEffect(() => {
     void flush()
@@ -152,7 +227,7 @@ export function useChat(params: {
     async (raw: string) => {
       const text = raw.trim()
       if (!text || busy || pending) return
-      setMessages((m) => [...m, { id: newId(), at: Date.now(), role: 'user', text }])
+      apply((m) => [...m, { id: newId(), at: nextAt(m, Date.now()), role: 'user', text }])
       setBusy(true)
       try {
         const step = await interpret(text, env(), deps)
@@ -163,7 +238,7 @@ export function useChat(params: {
         setBusy(false)
       }
     },
-    [busy, pending, env, deps, push, commit],
+    [busy, pending, env, deps, push, commit, apply],
   )
 
   /** Kullanıcı kategori(ler)i onayladı. */
@@ -204,15 +279,15 @@ export function useChat(params: {
         }
       }
       setOutbox(readOutbox(userId))
-      setMessages((m) =>
+      apply((m) =>
         m.map((x) =>
           x.id === messageId && x.role === 'bot' ? { ...x, expenses: x.expenses?.map((e) => ({ ...e, undone: true })) } : x,
         ),
       )
       await reload()
     },
-    [messages, userId, push, reload],
+    [messages, userId, push, reload, apply],
   )
 
-  return { messages, pending, busy, outbox, categories, labels, send, confirm, cancel, undo }
+  return { messages, history, chatQueue, loadOlder, pending, busy, outbox, categories, labels, send, confirm, cancel, undo }
 }

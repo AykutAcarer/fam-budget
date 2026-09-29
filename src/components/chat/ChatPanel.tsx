@@ -130,12 +130,14 @@ function ConfirmCard({
 export function ChatPanel({ chat, colorOf }: { chat: Chat; colorOf: ColorLookup }) {
   const [input, setInput] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
-  const { messages, pending, busy, outbox, labels, categories } = chat
-  const visible = messages.slice(-30)
+  const { messages, history, chatQueue, pending, busy, outbox, labels, categories } = chat
+  const visible = messages
+  const lastId = messages.at(-1)?.id
 
+  // Yalnız yeni mesaj geldiğinde aşağı kay (eski mesajlar yüklenince değil).
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages.length, pending, busy])
+  }, [lastId, pending, busy])
 
   function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -148,8 +150,23 @@ export function ChatPanel({ chat, colorOf }: { chat: Chat; colorOf: ColorLookup 
     <>
       <Card>
         <CardTitle>Sohbet</CardTitle>
+        {history.hasMore && (
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => void chat.loadOlder()}
+              disabled={history.loading}
+              className="min-h-9 rounded-full px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            >
+              {history.loading ? 'Yükleniyor…' : 'Daha eski mesajlar'}
+            </button>
+          </div>
+        )}
+        {history.error && messages.length === 0 && (
+          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">Sohbet geçmişi şu an yüklenemedi; bağlantı gelince görünecek.</p>
+        )}
         <div className="mt-3 space-y-2.5" aria-live="polite">
-          {visible.length === 0 && (
+          {visible.length === 0 && !history.loading && (
             <div className="flex">
               <p className="max-w-[85%] rounded-2xl rounded-tl-md bg-slate-100 px-3.5 py-2.5 text-sm dark:bg-slate-800">
                 Merhaba! Harcamanı buraya yazman yeterli, ör. <b>“8,25 halısaha”</b> ya da{' '}
@@ -203,6 +220,11 @@ export function ChatPanel({ chat, colorOf }: { chat: Chat; colorOf: ColorLookup 
         {outbox.length > 0 && (
           <p className="mx-auto mb-1.5 max-w-2xl text-xs text-amber-700 dark:text-amber-300">
             ⏳ {outbox.length} harcama cihazda bekliyor; bağlantı gelince gönderilecek.
+          </p>
+        )}
+        {outbox.length === 0 && chatQueue > 0 && (
+          <p className="mx-auto mb-1.5 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
+            {chatQueue} mesaj cihazda bekliyor; bağlantı gelince diğer cihazlarla eşitlenecek.
           </p>
         )}
         <div className="mx-auto flex max-w-2xl items-center gap-2">

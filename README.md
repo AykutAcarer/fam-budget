@@ -19,6 +19,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
 - [x] **Ayarlar > Kategoriler:** ekle / düzenle (ad, tür, erişilebilir renk, anahtar kelimeler), harcamaları taşıyıp silme; yedek parser kullanıcının anahtar kelimelerini kullanır
+- [x] **Sohbet geçmişi cihazlar arası:** mesajlar veritabanında (son 50 + "Daha eski mesajlar"); çevrimdışı yazılanlar cihazda bekler, bağlantı gelince kopyasız gönderilir
 - [x] **PWA:** ana ekrana eklenebilir, çevrimdışı açılan kabuk, "Yeni sürüm var — Yenile" bildirimi
 
 ## Kurulum
@@ -38,6 +39,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder), içe aktarmanın bunu taşıması ve döngü devri fonksiyonu `roll_forward_cycle` |
      | `20261003000000_category_management.sql` | Kategorilere `keywords` (yedek parser anahtar kelimeleri; mevcut varsayılan kategorilere de yazılır), taşı-sil fonksiyonu `delete_category`, içe aktarmada `keywords` |
      | `20261004000000_debt_payments.sql` | Borç ödeme geçmişi tablosu `debt_payments` (RLS) + bakiyeyi aynı işlemde güncelleyen tetikleyici |
+     | `20261005000000_chat_messages.sql` | Sohbet geçmişi tablosu `chat_messages` (RLS) — cihazlar arası sohbet |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -178,6 +180,12 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 - **Harcama kaybolmaz:** Edge Function'a ulaşılamazsa kural tabanlı parser devreye girer; veritabanına ulaşılamazsa kalem
   cihazda kuyruğa alınır ve bağlantı gelince (istemcide üretilmiş id ile, kopya oluşmadan) gönderilir.
 - Her cevaptaki **Geri al** kaydı siler.
+- **Geçmiş cihazlar arası:** mesajlar `chat_messages` tablosunda; açılışta son 50 mesaj yüklenir, üstteki
+  "Daha eski mesajlar" ile 50'şer geriye gidilir. Her yeni ya da değişen mesaj (geri alındı, kuyruktan gönderildi) önce
+  cihazdaki gönderim kuyruğuna (`butcem:chat-queue:<kullanıcı>`) yazılır, sonra `id` ile upsert edilir; bağlantı yoksa
+  kuyrukta bekler ve `online` olayında gönderilir — tekrar denemek kopya üretmez. Önceki sürümün yalnız bu cihazda tutulan
+  geçmişi ilk açılışta bir kez veritabanına aktarılır. Mantık [`chatHistory.ts`](src/lib/chatHistory.ts) (testli);
+  veritabanı testleri `supabase/tests/chat-messages.test.ts`.
 - **Tekrar hatırlatması:** kaydedilen kategoride son 7 günde (bugün dahil, döngü içinde) kaç farklı günde harcama
   yapıldığını ve kategorinin döngü toplamını KOD hesaplar ([`repeat.ts`](src/lib/repeat.ts)); hatırlatma kararını da kod
   verir: yalnızca kısılabilir kategoride ve ≥ 4 günde `hatirlat: true`. Bu bilgi cevap çağrısına `context.repeat` olarak
@@ -192,6 +200,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
 | `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.installments_left`: kalan taksit (taksit değilse NULL). |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
+| `chat_messages` | Sohbet mesajları (`role` `user`/`assistant`, `content`, `meta` — kaydedilen kalemler, geri alındı, cevabı kim yazdı; `related_expense_id`). `id` ve `created_at` istemciden gelir: çevrimdışı kuyruktan upsert kopya üretmez, geç gönderilen mesaj kendi zamanında sıralanır. |
 | `debt_payments` | Borç ödemeleri (`debt_id`, `date`, `amount`, `note`). Borca `(debt_id, user_id)` bileşik FK ile bağlı; borç silinince silinir. Ekle / sil / tutar düzenle, tetikleyiciyle borcun `balance`'ını aynı işlemde günceller; kalan bakiyeden büyük ödeme reddedilir. |
 
 | RPC | Açıklama |
@@ -338,6 +347,7 @@ src/
     budget.ts                 dashboard verisi → kıyas, KPI'lar, kategori dağılımı (saf, testli)
     chatFlow.ts               sohbet akışı: parse → onay → kaydet → kıyas → cevap (testli)
     chatText.ts               kodla üretilen özet + AI cevabı rakam doğrulaması
+    chatHistory.ts, chatHistoryApi.ts  sohbet geçmişi: satır ↔ mesaj, birleştirme, gönderim kuyruğu (saf, testli) + Supabase
     fallbackParser.ts         kural tabanlı yedek parser (kullanıcının anahtar kelimeleriyle)
     categories.ts, categoriesApi.ts  kategori key/renk/anahtar kelime doğrulaması (saf, testli) + Supabase
     expensesApi.ts, outbox.ts harcama kaydı + çevrimdışı kuyruk
