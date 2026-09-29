@@ -100,7 +100,7 @@ describe('buildExport', () => {
     const id = () => `id-${++seq}`
     const rows: ExportRows = { categories: [], debts: [], cycles: [], income: [], fixed: [], variable: [] }
     data.categories.forEach((c, i) =>
-      rows.categories.push({ ...c, id: id(), user_id: userId, sort_order: i + 1, created_at: '' }),
+      rows.categories.push({ ...c, keywords: c.keywords ?? [], id: id(), user_id: userId, sort_order: i + 1, created_at: '' }),
     )
     data.debts.forEach((d) =>
       rows.debts.push({
@@ -134,5 +134,24 @@ describe('buildExport', () => {
     expect(out.debts).toEqual(data.debts.map((d) => ({ ...d, note: d.note ?? null })))
     expect(out.cycles).toEqual(expected)
     expect(normalizeImport(out).data.cycles).toEqual(expected)
+  })
+})
+
+describe('kategori anahtar kelimeleri', () => {
+  const spor = { key: 'spor', label: 'Spor', type: 'kisilabilir', color: '#3E89DE' }
+
+  it('içe aktarmada isteğe bağlıdır; liste değilse hata', () => {
+    expect(normalizeImport({ categories: [{ ...spor, keywords: ['fitness', 'yüzme'] }] }).data.categories).toEqual([
+      { ...spor, keywords: ['fitness', 'yüzme'] },
+    ])
+    expect(normalizeImport({ categories: [spor] }).data.categories).toEqual([spor])
+    expect(problemsOf({ categories: [{ ...spor, keywords: 'fitness' }] })).toEqual(['categories[0].keywords: metin listesi olmalı'])
+  })
+
+  it('dışa aktarmada yalnız doluysa yazılır', () => {
+    const row = (keywords: string[]) => ({ ...spor, type: 'kisilabilir' as const, id: 'c', user_id: 'u', sort_order: 1, created_at: '', keywords })
+    const rows = (keywords: string[]): ExportRows => ({ categories: [row(keywords)], debts: [], cycles: [], income: [], fixed: [], variable: [] })
+    expect(buildExport(rows(['fitness']), 'x').categories).toEqual([{ ...spor, keywords: ['fitness'] }])
+    expect(buildExport(rows([]), 'x').categories).toEqual([spor])
   })
 })

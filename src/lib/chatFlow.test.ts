@@ -186,8 +186,8 @@ describe('saveAndRespond — tekrar hatırlatması', () => {
   const withTypes = (variable: VariableExpenseRow[]): BudgetData => ({
     ...budget(variable),
     categories: [
-      { id: '1', user_id: 'u', key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', sort_order: 4, created_at: '' },
-      { id: '2', user_id: 'u', key: 'mutfak', label: 'Mutfak', type: 'zorunlu', color: '#22A06B', sort_order: 1, created_at: '' },
+      { id: '1', user_id: 'u', key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', sort_order: 4, keywords: [], created_at: '' },
+      { id: '2', user_id: 'u', key: 'mutfak', label: 'Mutfak', type: 'zorunlu', color: '#22A06B', sort_order: 1, keywords: [], created_at: '' },
     ],
   })
   // Bugün 18 Eyl (döngünün 4. günü): 15, 16, 17 Eyl'deki kahvaltılar + bugün kaydedilen → 4 farklı gün.

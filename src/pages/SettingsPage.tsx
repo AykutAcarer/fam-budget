@@ -1,11 +1,11 @@
 /**
- * Ayarlar: baz ay, tema, veri içe/dışa aktarma, çıkış.
- * (Kategori yönetimi sonraki adımlarda.)
+ * Ayarlar: baz ay, kategoriler, tema, veri içe/dışa aktarma, çıkış.
  */
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { BaselineCard } from '../components/BaselineCard'
 import { DataTransferCard } from '../components/DataTransferCard'
+import { CategoriesCard } from '../components/settings/CategoriesCard'
 import { Card, CardTitle, PageHeader } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { useTheme, type ThemePref } from '../lib/theme'
@@ -33,6 +33,8 @@ export function SettingsPage() {
 
       <div className="space-y-4">
         <BaselineCard />
+
+        <CategoriesCard />
 
         <Card>
           <CardTitle>Tema</CardTitle>

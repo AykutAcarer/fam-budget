@@ -17,7 +17,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
-- [ ] Ayarlar: kategori yönetimi
+- [x] **Ayarlar > Kategoriler:** ekle / düzenle (ad, tür, erişilebilir renk, anahtar kelimeler), harcamaları taşıyıp silme; yedek parser kullanıcının anahtar kelimelerini kullanır
 - [x] **PWA:** ana ekrana eklenebilir, çevrimdışı açılan kabuk, "Yeni sürüm var — Yenile" bildirimi
 
 ## Kurulum
@@ -35,6 +35,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20260930000000_accessible_category_colors.sql` | Erişilebilir kategori renkleri + eski pastel renkleri taşıma |
      | `20261001000000_fixed_expense_installments.sql` | Sabit giderlere `installments_left` (kalan taksit) + içe aktarmanın bunu taşıması |
      | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder), içe aktarmanın bunu taşıması ve döngü devri fonksiyonu `roll_forward_cycle` |
+     | `20261003000000_category_management.sql` | Kategorilere `keywords` (yedek parser anahtar kelimeleri; mevcut varsayılan kategorilere de yazılır), taşı-sil fonksiyonu `delete_category`, içe aktarmada `keywords` |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -185,7 +186,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 
 | Tablo | Açıklama |
 |---|---|
-| `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir (bkz. *Kategori renkleri*). |
+| `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`, `keywords`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir (bkz. *Kategori renkleri*, *Kategori yönetimi*). |
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
 | `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.installments_left`: kalan taksit (taksit değilse NULL). |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
@@ -194,6 +195,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 |---|---|
 | `set_baseline_cycle(uuid)` | Baz ayı tek işlemde değiştirir. |
 | `roll_forward_cycle(uuid)` | Döngü devri — kaynak döngüden sonraki döngüyü tek işlemde üretir (bkz. *Döngü devri*). İdempotent. |
+| `delete_category(text, text)` | Kategoriyi siler; harcaması varsa ikinci parametredeki kategoriye taşıyıp siler (tek işlem). Hedefsiz çağrı, harcaması olan kategoride hata verir; son kategori silinemez. |
 | `import_data(jsonb)` | JSON içe aktarma — tek işlem (atomik), idempotent. Döngüler `key`'e göre upsert edilip kayıtları dosyadakilerle değiştirilir; borçlar ada göre eşlenir; kullanıcının mevcut kategorileri korunur. |
 
 **Güvenlik:**
@@ -207,6 +209,22 @@ baz ay kuralı ve `ornek_veri.json`'ın içe aktarılması (idempotentlik, atomi
 
 **Kişisel veri:** gerçek bütçe verisi repoya girmez (`butce_verisi.json` `.gitignore`'da). Testler ve örnekler yalnızca
 tamamen sentetik `ornek_veri.json`'ı kullanır.
+
+## Kategori yönetimi (Ayarlar > Kategoriler)
+
+- **Ekle / düzenle:** ad, tür (zorunlu / kısılabilir / yarı zorunlu / borç ödemesi), renk ve isteğe bağlı anahtar kelimeler
+  (virgülle). `key` addan üretilir ve kullanıcı içinde tekildir (`spor`, çakışırsa `spor-2` …); ad sonradan değişse de
+  `key` sabit kalır (harcamalar ona bağlı). Aynı ad (Türkçe harf / büyük-küçük duyarsız) reddedilir.
+- **Renk erişilebilirliği:** renk açık (#ffffff) ve koyu (#0f172a) zeminde ≥ 3:1 kontrast sağlamalı; sağlamazsa kaydedilmez,
+  hangi temada sorun olduğu söylenir ve aynı tonda geçen bir renk önerilir ("Okunur tonu kullan").
+- **Sil:** harcaması yoksa iki adımlı onay. Varsa önce hedef kategori seçilir; `delete_category` harcamaları taşır ve
+  kategoriyi tek işlemde siler.
+- **Yedek parser:** internet / yapay zeka yokken kategori, kullanıcının kategorilerindeki anahtar kelimelerle bulunur
+  (kategori sırasıyla; 4+ harfli kelime kelime başında eşleşir — "market" → "marketten"; kısa kelimeler tam kelime).
+  Hiçbiri tutmazsa "sosyal", o yoksa ilk kategori. Varsayılan kelimeler tek kaynaktadır (`_shared/categories.ts`).
+- **Yapay zeka:** kategori enum'u kullanıcının gerçek key'lerinden üretilir; ad ve anahtar kelimeler `context.categories`
+  içinde gider (sistem promptu buna göre güncellendi).
+- Saf mantık [`src/lib/categories.ts`](src/lib/categories.ts) (testli); veritabanı testleri `supabase/tests/category-management.test.ts`.
 
 ## Kategori renkleri
 
@@ -305,13 +323,15 @@ src/
     chat/                     ChatPanel (sohbet arayüzü), useChat (sohbet durumu)
     dashboard/                kıyas kartı, KPI'lar, kategori donut'u + tablosu
     DataTransferCard.tsx      Ayarlar > içe/dışa aktarma
+    settings/                 Ayarlar > Kategoriler (liste + form)
   lib/
     compare.ts                kıyas motoru + döngü detay serileri (saf, testli)
     expenseEdit.ts            harcama düzenleme doğrulaması (saf, testli)
     budget.ts                 dashboard verisi → kıyas, KPI'lar, kategori dağılımı (saf, testli)
     chatFlow.ts               sohbet akışı: parse → onay → kaydet → kıyas → cevap (testli)
     chatText.ts               kodla üretilen özet + AI cevabı rakam doğrulaması
-    fallbackParser.ts         kural tabanlı yedek parser
+    fallbackParser.ts         kural tabanlı yedek parser (kullanıcının anahtar kelimeleriyle)
+    categories.ts, categoriesApi.ts  kategori key/renk/anahtar kelime doğrulaması (saf, testli) + Supabase
     expensesApi.ts, outbox.ts harcama kaydı + çevrimdışı kuyruk
     transfer.ts               içe aktarma doğrulama / dışa aktarma (saf)
     fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase

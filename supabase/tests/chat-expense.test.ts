@@ -96,6 +96,25 @@ describe('Anthropic isteği', () => {
     expect(sentBody().tools[0].input_schema.properties.expenses.items.properties.category.enum).toEqual(['sosyal', 'spor'])
   })
 
+  it('kullanıcının anahtar kelimeleri bağlamda modele gider; bozuk olanlar elenir', async () => {
+    const { call, sentBody } = setup(() => claudeResponse({ expenses: [], reply: 'x', clarify: null }))
+    await call({
+      mode: 'parse',
+      message: 'fitness 30',
+      context: {
+        today: TODAY,
+        categories: [
+          { key: 'sosyal', label: 'Sosyal', keywords: [] },
+          { key: 'spor', label: 'Spor', keywords: ['fitness', 42, ' ', 'yüzme'] },
+        ],
+      },
+    })
+    const content: string = sentBody().messages[0].content
+    expect(content).toContain('{"key":"spor","label":"Spor","keywords":["fitness","yüzme"]}')
+    expect(content).toContain('{"key":"sosyal","label":"Sosyal"}')
+    expect(content).toContain('context.categories')
+  })
+
   it('reply modu kıyas rakamlarını bağlamda gönderir', async () => {
     const comparison = { cycleDay: 14, dortluBuAy: 120.5, dortluBazAy: 160.25, fark: -39.75, kategoriBuAy: 16.5, kategoriBazAyTumAy: 33 }
     const { call, sentBody } = setup(() =>

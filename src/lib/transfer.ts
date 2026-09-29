@@ -18,6 +18,8 @@ export interface FileCategory {
   label: string
   type: CategoryType
   color: string
+  /** Yedek parser anahtar kelimeleri (isteğe bağlı; boşsa dosyaya yazılmaz). */
+  keywords?: string[]
 }
 
 export interface FileDebt {
@@ -186,7 +188,13 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
     if (!CATEGORY_TYPES.includes(type)) r.fail(`${p}.type`, `'${CATEGORY_TYPES.join("' | '")}' olmalı`)
     const color = typeof c.color === 'string' && HEX_COLOR.test(c.color) ? c.color : undefined
     if (!color) r.fail(`${p}.color`, '#RRGGBB biçiminde olmalı')
-    if (key && label !== undefined && color && CATEGORY_TYPES.includes(type)) categories.push({ key, label, type, color })
+    let keywords: string[] | undefined
+    if (c.keywords !== undefined) {
+      if (Array.isArray(c.keywords) && c.keywords.every((k) => typeof k === 'string')) keywords = c.keywords as string[]
+      else r.fail(`${p}.keywords`, 'metin listesi olmalı')
+    }
+    if (key && label !== undefined && color && CATEGORY_TYPES.includes(type))
+      categories.push({ key, label, type, color, ...(keywords?.length ? { keywords } : {}) })
   })
 
   const categoryKeys = new Set([...knownCategoryKeys, ...categories.map((c) => c.key)])
@@ -325,7 +333,7 @@ export function buildExport(rows: ExportRows, generatedAt: string): BudgetFile {
     meta: { currency: 'EUR', locale: 'de-DE', generatedAt, cycleModel: 'payday-anchored', app: 'Bütçem' },
     categories: [...rows.categories]
       .sort((a, b) => a.sort_order - b.sort_order)
-      .map(({ key, label, type, color }) => ({ key, label, type, color })),
+      .map(({ key, label, type, color, keywords }) => ({ key, label, type, color, ...(keywords?.length ? { keywords } : {}) })),
     debts: [...rows.debts]
       .sort((a, b) => a.priority - b.priority)
       .map((d) => ({

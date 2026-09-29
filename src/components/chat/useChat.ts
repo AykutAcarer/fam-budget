@@ -76,8 +76,8 @@ export function useChat(params: {
   const categories = useMemo(
     () =>
       data?.categories.length
-        ? data.categories.map((c) => ({ key: c.key, label: c.label }))
-        : DEFAULT_CATEGORIES.map(({ key, label }) => ({ key, label })),
+        ? data.categories.map((c) => ({ key: c.key, label: c.label, keywords: c.keywords ?? [] }))
+        : DEFAULT_CATEGORIES.map(({ key, label, keywords }) => ({ key, label, keywords: [...keywords] })),
     [data],
   )
   const labels = useMemo(() => new Map(categories.map((c) => [c.key, c.label])), [categories])

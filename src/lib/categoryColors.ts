@@ -87,7 +87,7 @@ function oklchToLin(L: number, C: number, H: number): [number, number, number] {
 }
 
 /** OKLCH → hex; gamut dışındaysa ton ve açıklık korunarak doygunluk azaltılır. */
-function fromOklch(L: number, C: number, H: number): string {
+export function fromOklch(L: number, C: number, H: number): string {
   let c = C
   let rgb = oklchToLin(L, c, H)
   while (rgb.some((v) => v < 0 || v > 1) && c > 0) {

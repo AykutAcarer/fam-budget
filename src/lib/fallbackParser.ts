@@ -4,13 +4,15 @@
  *
  * - Tutar: tarih ifadeleri çıkarıldıktan sonra metindeki ilk sayı. Türkçe
  *   ondalık virgül ("8,25" = 8.25); nokta binlik ayırıcıdır ("1.250" = 1250).
- * - Kategori: app_system_prompt.md'deki kategori tanımlarıyla aynı anahtar
- *   kelimeler, öncelik sırasıyla; hiçbiri tutmazsa "sosyal".
+ * - Kategori: kullanıcının kategorilerindeki anahtar kelimeler (Ayarlar'dan
+ *   düzenlenir; varsayılanlar _shared/categories.ts), kategori sırasıyla;
+ *   hiçbiri tutmazsa "sosyal".
  * - Tarih: varsayılan bugün; "dün", "evvelsi gün", "25 eylülde", "25.09".
  */
 import dayjs from 'dayjs'
 import { clampIsoDate } from './date'
 import { roundMoney } from './money'
+import { DEFAULT_CATEGORIES } from '../../supabase/functions/_shared/categories'
 
 export interface FallbackExpense {
   amount: number
@@ -29,25 +31,42 @@ export function foldTurkish(text: string): string {
   return folded.length === text.length ? folded : text.toLowerCase()
 }
 
-/**
- * Kategori kuralları — SIRA ÖNEMLİ: ilk eşleşen kazanır.
- * Ör. "hanım kahvaltı" → kahvalti (hanim'dan önce), "eşime döner" → sosyal
- * (dışarıda yemek; hanim yalnızca nakit içindir ve en sonda denenir).
- */
-const CATEGORY_RULES: [key: string, patterns: RegExp[]][] = [
-  ['kredi karti', [/\bkredi ?kart/, /\bkk\b/]],
-  ['halisaha', [/\bhali ?saha/, /\bmac(a|ta|tan|i|in)?\b/, /\bsaha kira/]],
-  ['yakit', [/\bbenzin/, /\bmazot/, /\bdizel/, /\bdepo/, /\byakit/]],
-  ['mensemax', [/\bmens[ae]/, /\bokul yemeg/]],
-  ['temizlik', [/\brossmann?/, /\bdm\b/, /\bdeterjan/, /\btemizlik/, /\bkisisel bakim/]],
-  ['kahvalti', [/\bkahvalti/, /\bpogaca/, /\bsimit/, /\bborek/]],
-  ['is', [/\biste\b/, /\bis\b/, /\bis ?yeri/, /\bogle/, /\batistirmalik/, /\bkahve\b/, /\bmola/]],
-  ['mutfak', [/\bmarket/, /\bmutfak/, /\bet(ten|i|e)?\b/, /\bmanav/, /\bbakkal/, /\bkasap/]],
-  ['sosyal', [/\bdoner/, /\bdondurma/, /\bsinema/, /\boyuncak/, /\bgiyim/, /\bgezme/, /\byemek/, /\brestoran/, /\bpizza/, /\bkafe/]],
-  ['hanim', [/\besim(e|e para)?\b/, /\bhanim(a|im|ima)?\b/, /\bharclik/]],
-]
+/** Yedek parser için kategori kuralı: kullanıcının kategorisi + anahtar kelimeleri. */
+export interface CategoryRule {
+  key: string
+  keywords: readonly string[]
+}
 
-const DEFAULT_CATEGORY = 'sosyal'
+/** Varsayılan kurallar (tek kaynak: _shared/categories.ts); kullanıcı kategorileri yoksa. */
+export const DEFAULT_RULES: readonly CategoryRule[] = DEFAULT_CATEGORIES
+
+const FALLBACK_KEY = 'sosyal'
+
+/**
+ * Kullanıcı kategorilerinden kurallar. Anahtar kelime alanı hiç gelmemişse
+ * (eski veri / migration öncesi) varsayılan kategorinin kelimeleri kullanılır;
+ * boş liste ise kullanıcı bilinçli olarak boşaltmıştır.
+ */
+export function rulesFor(categories: readonly { key: string; keywords?: readonly string[] | null }[]): CategoryRule[] {
+  return categories.map((c) => ({
+    key: c.key,
+    keywords: c.keywords ?? DEFAULT_CATEGORIES.find((d) => d.key === c.key)?.keywords ?? [],
+  }))
+}
+
+/**
+ * Anahtar kelime → düzenli ifade (katlanmış metin üzerinde). 4+ harfli kelimeler
+ * kelime başında eşleşir ("market" → "marketten"); 3 ve daha kısa olanlar yalnız
+ * tam kelime olarak ("et" "sepet"te eşleşmez; "iş" "isim"de eşleşmez).
+ */
+export function keywordPattern(keyword: string): RegExp | null {
+  const k = foldTurkish(keyword.trim()).replace(/\s+/g, ' ')
+  if (!k) return null
+  const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // \b yalnız [A-Za-z0-9_] tanır; "c++" gibi kelimeler için harf/rakam sınırı kullanılır.
+  const after = k.replace(/\s/g, '').length <= 3 ? '(?![\\p{L}\\p{N}])' : ''
+  return new RegExp(`(?<![\\p{L}\\p{N}])${esc}${after}`, 'u')
+}
 
 const MONTHS = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik']
 
@@ -129,21 +148,24 @@ export function parseTurkishAmount(raw: string): number | null {
   return Number.isFinite(n) && n > 0 ? roundMoney(n) : null
 }
 
-/** Kategoriyi anahtar kelimelerle bulur. */
-export function detectCategory(folded: string, allowed?: ReadonlySet<string>): { category: string; matched: boolean } {
-  for (const [key, patterns] of CATEGORY_RULES) {
-    if (allowed && !allowed.has(key)) continue
-    if (patterns.some((p) => p.test(folded))) return { category: key, matched: true }
+/**
+ * Kategoriyi anahtar kelimelerle bulur. Birden çok kategori eşleşirse listede
+ * önce gelen kazanır (kategori sırası). Hiçbiri tutmazsa "sosyal" (yoksa ilk kategori).
+ */
+export function detectCategory(folded: string, rules: readonly CategoryRule[] = DEFAULT_RULES): { category: string; matched: boolean } {
+  for (const rule of rules) {
+    if (rule.keywords.some((kw) => keywordPattern(kw)?.test(folded))) return { category: rule.key, matched: true }
   }
-  return { category: DEFAULT_CATEGORY, matched: false }
+  const fallback = rules.some((r) => r.key === FALLBACK_KEY) ? FALLBACK_KEY : (rules[0]?.key ?? FALLBACK_KEY)
+  return { category: fallback, matched: false }
 }
 
 /**
  * Serbest Türkçe metinden tek bir harcama çıkarır. Tutar bulunamazsa null.
  * @param today 'YYYY-MM-DD' (tarih çözümü buna göre yapılır)
- * @param categoryKeys Kullanıcının kategorileri (verilirse yalnızca bunlar seçilir)
+ * @param rules Kullanıcının kategorileri ve anahtar kelimeleri, kategori sırasıyla
  */
-export function fallbackParse(text: string, today: string, categoryKeys?: Iterable<string>): FallbackExpense | null {
+export function fallbackParse(text: string, today: string, rules: readonly CategoryRule[] = DEFAULT_RULES): FallbackExpense | null {
   const folded = foldTurkish(text)
   const { date, span: dateSpan } = extractDate(folded, today)
 
@@ -156,7 +178,7 @@ export function fallbackParse(text: string, today: string, categoryKeys?: Iterab
   const amount = parseTurkishAmount(num[0])
   if (amount === null) return null
 
-  const { category, matched } = detectCategory(folded, categoryKeys ? new Set(categoryKeys) : undefined)
+  const { category, matched } = detectCategory(folded, rules)
 
   // Açıklama: kullanıcının kendi ifadesi, tutar ve tarih çıkarılmış.
   const spans = [dateSpan, { start: num.index, end: num.index + num[0].length }].filter((s): s is Span => s !== null)

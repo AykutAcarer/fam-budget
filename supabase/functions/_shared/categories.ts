@@ -1,7 +1,8 @@
 /**
  * Varsayılan kategoriler ve renk paleti — TEK KAYNAK.
  *
- * Kullananlar: istemci (renkler, rozetler, donut sırası, yedek kategori listesi),
+ * Kullananlar: istemci (renkler, rozetler, donut sırası, yedek kategori listesi ve
+ * yedek parser anahtar kelimeleri),
  * chat-expense Edge Function (varsayılan kategori enum'u) ve veritabanı seed'i.
  * SQL bu dosyayı okuyamadığı için seed_default_categories() bunun birebir
  * aynasıdır; supabase/tests/category-colors.test.ts ikisinin aynı olduğunu doğrular.
@@ -21,20 +22,26 @@ export interface DefaultCategory {
   label: string
   type: CategoryType
   color: string
+  /** Yedek parser anahtar kelimeleri (Türkçe, küçük harf). */
+  keywords: readonly string[]
 }
 
-/** sort_order sırasıyla (1'den başlar). */
+/**
+ * sort_order sırasıyla (1'den başlar). keywords: yedek (çevrimdışı) parser'ın
+ * anahtar kelimeleri — kullanıcı Ayarlar'dan düzenleyebilir. Birden çok
+ * kategori eşleşirse sırada önce gelen kazanır.
+ */
 export const DEFAULT_CATEGORIES: readonly DefaultCategory[] = [
-  { key: 'mutfak', label: 'Mutfak / Market', type: 'zorunlu', color: '#22A06B' },
-  { key: 'yakit', label: 'Yakıt', type: 'zorunlu', color: '#E47007' },
-  { key: 'mensemax', label: 'MensaMax (okul yemeği)', type: 'zorunlu', color: '#C026D3' },
-  { key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11' },
-  { key: 'is', label: 'İş / öğlen / atıştırmalık', type: 'kisilabilir', color: '#E23B3B' },
-  { key: 'halisaha', label: 'Halı saha', type: 'kisilabilir', color: '#3E89DE' },
-  { key: 'sosyal', label: 'Sosyal / diğer', type: 'kisilabilir', color: '#7C4DFF' },
-  { key: 'temizlik', label: 'Temizlik / Rossmann', type: 'yari', color: '#17A2B8' },
-  { key: 'hanim', label: 'Hanıma verilen', type: 'yari', color: '#A1592B' },
-  { key: 'kredi karti', label: 'Kredi kartı ödemesi', type: 'borc', color: '#6B7280' },
+  { key: 'mutfak', label: 'Mutfak / Market', type: 'zorunlu', color: '#22A06B', keywords: ['market', 'mutfak', 'et', 'eti', 'etten', 'manav', 'bakkal', 'kasap'] },
+  { key: 'yakit', label: 'Yakıt', type: 'zorunlu', color: '#E47007', keywords: ['benzin', 'mazot', 'dizel', 'depo', 'yakıt'] },
+  { key: 'mensemax', label: 'MensaMax (okul yemeği)', type: 'zorunlu', color: '#C026D3', keywords: ['mensemax', 'mensamax', 'mensa', 'okul yemeği'] },
+  { key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', keywords: ['kahvaltı', 'poğaça', 'simit', 'börek'] },
+  { key: 'is', label: 'İş / öğlen / atıştırmalık', type: 'kisilabilir', color: '#E23B3B', keywords: ['iş', 'işte', 'iş yeri', 'işyeri', 'öğle', 'atıştırmalık', 'kahve', 'mola'] },
+  { key: 'halisaha', label: 'Halı saha', type: 'kisilabilir', color: '#3E89DE', keywords: ['halı saha', 'halısaha', 'maç', 'maça', 'maçta', 'saha kira'] },
+  { key: 'sosyal', label: 'Sosyal / diğer', type: 'kisilabilir', color: '#7C4DFF', keywords: ['döner', 'dondurma', 'sinema', 'oyuncak', 'giyim', 'gezme', 'yemek', 'restoran', 'pizza', 'kafe'] },
+  { key: 'temizlik', label: 'Temizlik / Rossmann', type: 'yari', color: '#17A2B8', keywords: ['rossmann', 'dm', 'deterjan', 'temizlik', 'kişisel bakım'] },
+  { key: 'hanim', label: 'Hanıma verilen', type: 'yari', color: '#A1592B', keywords: ['eşime', 'eşim', 'hanım', 'hanıma', 'hanımım', 'harçlık'] },
+  { key: 'kredi karti', label: 'Kredi kartı ödemesi', type: 'borc', color: '#6B7280', keywords: ['kredi kart', 'kk'] },
 ]
 
 export const DEFAULT_CATEGORY_KEYS: readonly string[] = DEFAULT_CATEGORIES.map((c) => c.key)

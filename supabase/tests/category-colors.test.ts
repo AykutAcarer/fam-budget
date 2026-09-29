@@ -73,10 +73,17 @@ describe('renk migration\'ı', () => {
 
 describe('seed ↔ tek kaynak', () => {
   it('yeni kullanıcının varsayılan kategorileri DEFAULT_CATEGORIES ile birebir aynıdır', async () => {
-    const rows = await db.query<{ key: string; label: string; type: string; color: string; sort_order: number }>(
-      'select key, label, type, color, sort_order from public.categories where user_id = $1 order by sort_order',
+    const rows = await db.query<{ key: string; label: string; type: string; color: string; keywords: string[]; sort_order: number }>(
+      'select key, label, type, color, keywords, sort_order from public.categories where user_id = $1 order by sort_order',
       [NEW_USER],
     )
-    expect(rows.rows).toEqual(DEFAULT_CATEGORIES.map((c, i) => ({ ...c, sort_order: i + 1 })))
+    expect(rows.rows).toEqual(DEFAULT_CATEGORIES.map((c, i) => ({ ...c, keywords: [...c.keywords], sort_order: i + 1 })))
+  })
+
+  it('migration öncesi kullanıcıların varsayılan kategorilerine de anahtar kelimeler yazılır', async () => {
+    const rows = await db.query<{ key: string; keywords: string[] }>('select key, keywords from public.categories where user_id = $1', [LEGACY_USER])
+    expect(Object.fromEntries(rows.rows.map((r) => [r.key, r.keywords]))).toEqual(
+      Object.fromEntries(DEFAULT_CATEGORIES.map((c) => [c.key, [...c.keywords]])),
+    )
   })
 })

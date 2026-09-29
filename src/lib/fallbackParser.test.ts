@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectCategory, fallbackParse, foldTurkish, parseTurkishAmount } from './fallbackParser'
+import { detectCategory, fallbackParse, foldTurkish, keywordPattern, parseTurkishAmount } from './fallbackParser'
 
 const TODAY = '2026-09-28'
 
@@ -57,7 +57,8 @@ describe('fallbackParse — kenar durumlar', () => {
   })
 
   it('kullanıcının kategori listesiyle sınırlanır', () => {
-    expect(fallbackParse('8,25 halısaha', TODAY, ['mutfak', 'sosyal'])).toMatchObject({ category: 'sosyal', matched: false })
+    const rules = [{ key: 'mutfak', keywords: ['market'] }, { key: 'sosyal', keywords: [] }]
+    expect(fallbackParse('8,25 halısaha', TODAY, rules)).toMatchObject({ category: 'sosyal', matched: false })
   })
 
   it('kelime sınırı: "sepet" mutfak(et) değildir, "kahvaltı" iş(kahve) değildir', () => {
@@ -81,5 +82,39 @@ describe('parseTurkishAmount', () => {
     ['0', null],
   ])('%s → %s', (raw, expected) => {
     expect(parseTurkishAmount(raw)).toBe(expected)
+  })
+})
+
+describe('kullanıcı kategorileri ve anahtar kelimeleri', () => {
+  const rules = [
+    { key: 'mutfak', keywords: ['market'] },
+    { key: 'spor', keywords: ['spor salonu', 'fitness', 'yüzme'] },
+    { key: 'sosyal', keywords: ['döner'] },
+  ]
+
+  it('yeni kategorinin anahtar kelimesini tanır (Türkçe harf ve çekim ekiyle)', () => {
+    expect(fallbackParse('35 fitness üyeliği', TODAY, rules)).toMatchObject({ amount: 35, category: 'spor', matched: true })
+    expect(fallbackParse('YÜZMEYE 12', TODAY, rules)).toMatchObject({ category: 'spor' })
+    expect(fallbackParse('spor salonuna 40', TODAY, rules)).toMatchObject({ category: 'spor' })
+  })
+
+  it('birden çok eşleşmede kategori sırasında önce gelen kazanır', () => {
+    expect(fallbackParse('marketten döner 9', TODAY, rules)).toMatchObject({ category: 'mutfak' })
+    expect(fallbackParse('marketten döner 9', TODAY, [...rules].reverse())).toMatchObject({ category: 'sosyal' })
+  })
+
+  it('hiçbiri tutmazsa sosyal; sosyal yoksa ilk kategori', () => {
+    expect(fallbackParse('20 hediye', TODAY, rules)).toMatchObject({ category: 'sosyal', matched: false })
+    expect(fallbackParse('20 hediye', TODAY, rules.slice(0, 2))).toMatchObject({ category: 'mutfak', matched: false })
+  })
+
+  it('keywordPattern: kısa kelime tam, uzun kelime kelime başında eşleşir', () => {
+    expect(keywordPattern('et')!.test(foldTurkish('sepet'))).toBe(false)
+    expect(keywordPattern('et')!.test(foldTurkish('et aldım'))).toBe(true)
+    expect(keywordPattern('iş')!.test(foldTurkish('isim'))).toBe(false)
+    expect(keywordPattern('Market')!.test(foldTurkish('marketten'))).toBe(true)
+    expect(keywordPattern('halı saha')!.test(foldTurkish('HALI SAHA'))).toBe(true)
+    expect(keywordPattern('c++')!.test('c++ kursu')).toBe(true) // özel karakterler güvenli
+    expect(keywordPattern('   ')).toBeNull()
   })
 })

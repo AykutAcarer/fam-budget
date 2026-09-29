@@ -25,6 +25,8 @@ export type CategoryRow = {
   type: CategoryType
   color: string
   sort_order: number
+  /** Yedek parser anahtar kelimeleri. */
+  keywords: string[]
   created_at: string
 }
 
@@ -107,7 +109,7 @@ export type ImportSummary = {
 export interface Database {
   public: {
     Tables: {
-      categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order'>
+      categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order' | 'keywords'>
       cycles: Table<CycleRow, 'key' | 'label' | 'start_date' | 'end_date', Generated | 'is_baseline'>
       income: Table<IncomeRow, 'cycle_id' | 'date' | 'source' | 'amount', Generated | 'received' | 'note' | 'recurring'>
       fixed_expenses: Table<
@@ -133,6 +135,8 @@ export interface Database {
       import_data: { Args: { p_data: unknown }; Returns: ImportSummary }
       /** Kaynak döngüden sonraki döngüyü üretir (idempotent) → yeni döngünün id'si. */
       roll_forward_cycle: { Args: { p_cycle_id: string }; Returns: string }
+      /** Taşınan harcama sayısını döner. */
+      delete_category: { Args: { p_key: string; p_move_to?: string | null }; Returns: number }
     }
     Enums: { [_ in never]: never }
     CompositeTypes: { [_ in never]: never }

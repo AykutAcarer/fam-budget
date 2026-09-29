@@ -3,7 +3,7 @@ import { buildComparison, cycleSummary, type BudgetData } from './budget'
 import type { CategoryRow, CycleRow, VariableExpenseRow } from './database.types'
 
 const cat = (key: string, color: string, sort_order: number): CategoryRow => ({
-  id: key, user_id: 'u', key, label: key.toUpperCase(), type: 'kisilabilir', color, sort_order, created_at: '',
+  id: key, user_id: 'u', key, label: key.toUpperCase(), type: 'kisilabilir', color, sort_order, keywords: [], created_at: '',
 })
 const cycle = (id: string, start: string, end: string): CycleRow => ({
   id, user_id: 'u', key: id, label: id, start_date: start, end_date: end, is_baseline: id === 'b', created_at: '',

@@ -13,7 +13,7 @@ import type { ChatContext, ChatResult } from '../../supabase/functions/chat-expe
 import { buildComparison, buildRepeat, type BudgetData } from './budget'
 import type { Comparison } from './compare'
 import { replyIsGrounded, summaryText, type SavedItem } from './chatText'
-import { fallbackParse } from './fallbackParser'
+import { fallbackParse, rulesFor } from './fallbackParser'
 import type { NewExpense } from './outbox'
 import type { RepeatInfo } from './repeat'
 
@@ -77,7 +77,7 @@ export async function interpret(text: string, env: FlowEnv, deps: FlowDeps): Pro
   } catch {
     // Yapay zekaya ulaşılamadı (çevrimdışı, zaman aşımı, sunucu hatası): yedek parser.
     source = 'fallback'
-    const fb = fallbackParse(text, env.today, env.context.categories.map((c) => c.key))
+    const fb = fallbackParse(text, env.today, rulesFor(env.context.categories))
     if (!fb) return { kind: 'message', text: 'Tutarı anlayamadım 🤔 Şöyle yazabilirsin: “8,25 halısaha”.' }
     unmatched = !fb.matched
     result = {

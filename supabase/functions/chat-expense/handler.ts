@@ -34,6 +34,8 @@ export type ChatMode = 'parse' | 'reply'
 export interface ChatCategory {
   key: string
   label: string
+  /** Kullanıcının bu kategori için anahtar kelimeleri (eşleştirmede ipucu). */
+  keywords?: string[]
 }
 
 export interface ComparisonPayload {
@@ -180,7 +182,10 @@ export function parseChatRequest(body: unknown): ChatRequest | string {
     categories = []
     for (const c of context.categories) {
       if (!isObj(c) || typeof c.key !== 'string' || !c.key.trim()) return 'context.categories geçersiz'
-      categories.push({ key: c.key, label: typeof c.label === 'string' ? c.label : c.key })
+      const keywords = Array.isArray(c.keywords)
+        ? c.keywords.filter((k): k is string => typeof k === 'string' && k.trim() !== '').slice(0, 30).map((k) => k.slice(0, 40))
+        : []
+      categories.push({ key: c.key, label: typeof c.label === 'string' ? c.label : c.key, ...(keywords.length ? { keywords } : {}) })
     }
   }
 
@@ -272,6 +277,7 @@ export function buildUserContent(req: ChatRequest): string {
     req.mode === 'parse'
       ? [
           'GÖREV 1: Yalnızca harcamayı yapılandır.',
+          'category yalnızca context.categories içindeki bir key olabilir; label ve keywords o kategorinin ne olduğunu anlatır.',
           'Bu çağrıda kıyas rakamı YOK; reply alanına rakam veya kıyas yazma.',
           'Harcama varsa reply kısa bir onay olsun; harcama yoksa kibarca ne beklediğini söyle.',
         ]
