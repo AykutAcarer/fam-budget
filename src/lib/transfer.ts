@@ -36,6 +36,8 @@ export interface FileIncome {
   amount: number
   received: boolean
   note?: string | null
+  /** Her döngüde tekrar eder mi (isteğe bağlı; yoksa true). */
+  recurring?: boolean
 }
 
 export interface FileFixed {
@@ -47,6 +49,8 @@ export interface FileFixed {
   note?: string | null
   /** Kalan taksit sayısı (isteğe bağlı; eski dosyalarda yok). */
   installmentsLeft?: number | null
+  /** Her döngüde tekrar eder mi (isteğe bağlı; yoksa true). */
+  recurring?: boolean
 }
 
 export interface FileVariable {
@@ -232,7 +236,14 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
       const source = r.text(x, 'source', q)
       const amount = r.amount(x, 'amount', q)
       if (date && source !== undefined && amount !== undefined)
-        income.push({ date, source, amount, received: r.bool(x, 'received'), note: r.text(x, 'note', q, { optional: true }) ?? null })
+        income.push({
+          date,
+          source,
+          amount,
+          received: r.bool(x, 'received'),
+          note: r.text(x, 'note', q, { optional: true }) ?? null,
+          recurring: r.bool(x, 'recurring', true),
+        })
     })
 
     const fixed: FileFixed[] = []
@@ -251,6 +262,7 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
           source: r.text(x, 'source', q, { optional: true }) ?? null,
           note: r.text(x, 'note', q, { optional: true }) ?? null,
           installmentsLeft: r.count(x, 'installmentsLeft', q),
+          recurring: r.bool(x, 'recurring', true),
         })
     })
 
@@ -339,6 +351,7 @@ export function buildExport(rows: ExportRows, generatedAt: string): BudgetFile {
           amount: Number(x.amount),
           received: x.received,
           note: x.note,
+          recurring: x.recurring,
         })),
         fixed: perCycle(rows.fixed, c.id).map((x) => ({
           date: x.date,
@@ -348,6 +361,7 @@ export function buildExport(rows: ExportRows, generatedAt: string): BudgetFile {
           source: x.source,
           note: x.note,
           installmentsLeft: x.installments_left,
+          recurring: x.recurring,
         })),
         variable: perCycle(rows.variable, c.id).map((x) => ({
           date: x.date,

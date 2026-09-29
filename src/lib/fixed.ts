@@ -108,6 +108,8 @@ export interface FixedFormInput {
   amount: string
   card: boolean
   installmentsLeft: string
+  /** Her döngüde tekrar eder mi (devirde taşınır)? */
+  recurring: boolean
 }
 
 export interface FixedFormValue {
@@ -115,6 +117,7 @@ export interface FixedFormValue {
   item: string
   amount: number
   installmentsLeft: number | null
+  recurring: boolean
 }
 
 export type FixedFormResult =
@@ -144,7 +147,7 @@ export function validateFixedForm(input: FixedFormInput, cycle: { start: string;
   }
 
   if (Object.keys(errors).length) return { ok: false, errors }
-  return { ok: true, value: { date: date!, item, amount: amount!, installmentsLeft } }
+  return { ok: true, value: { date: date!, item, amount: amount!, installmentsLeft, recurring: input.recurring } }
 }
 
 /**

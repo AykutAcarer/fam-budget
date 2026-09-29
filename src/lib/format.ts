@@ -19,3 +19,10 @@ const pct = new Intl.NumberFormat('tr-TR', { style: 'percent', maximumFractionDi
 export function formatShare(share: number): string {
   return pct.format(share)
 }
+
+const amountInput = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/** Form alanı için Türkçe tutar metni: 2250 → '2.250,00' (parseTurkishAmount geri okur). */
+export function formatAmountInput(amount: number): string {
+  return amountInput.format(amount)
+}

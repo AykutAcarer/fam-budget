@@ -1,5 +1,5 @@
 /**
- * Sabit Giderler / Ödeme Takvimi (codex_prompt.md §6C).
+ * Gelir + Sabit Giderler / Ödeme Takvimi (codex_prompt.md §6C). Gelir bölümü üstte.
  * Aktif döngünün sabit giderleri: özet, yaklaşan/gecikmiş şeridi, ödeme
  * günü sıralı liste, ödendi işaretleme, ekle/düzenle/sil. Tüm toplamlar ve
  * durumlar src/lib/fixed.ts'ten; bu ekran yalnızca gösterir.
@@ -8,45 +8,20 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
 import { useMemo, useState } from 'react'
 import { FixedForm } from '../components/fixed/FixedForm'
+import { IncomeForm } from '../components/fixed/IncomeForm'
+import { IncomeSection } from '../components/fixed/IncomeSection'
+import { OneOffBadge, PaidSwitch } from '../components/fixed/PaidSwitch'
 import { StatusBadge, statusText } from '../components/fixed/StatusBadge'
 import { useFixed } from '../components/fixed/useFixed'
 import { CardIcon, CheckIcon, PlusIcon } from '../components/icons'
 import { Card, CardTitle, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
-import type { FixedExpenseRow } from '../lib/database.types'
+import type { FixedExpenseRow, IncomeRow } from '../lib/database.types'
 import { alertItems, daysUntil, fixedStatus, fixedTotals, isCardSource, sortFixed } from '../lib/fixed'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 
 type Editing = { row: FixedExpenseRow | null } | null
-
-function PaidSwitch({ row, pending, onToggle }: { row: FixedExpenseRow; pending: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={row.paid}
-      aria-label={`${row.item}: ${row.paid ? 'ödendi' : 'ödenecek'}`}
-      onClick={onToggle}
-      disabled={pending}
-      className="flex min-h-11 min-w-11 items-center justify-center disabled:opacity-60"
-    >
-      <span
-        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
-          row.paid ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-600'
-        }`}
-      >
-        <span
-          className={`inline-flex size-6 items-center justify-center rounded-full bg-white shadow transition-transform ${
-            row.paid ? 'translate-x-5.5' : 'translate-x-0.5'
-          }`}
-        >
-          {row.paid && <CheckIcon className="size-3.5 text-emerald-700" strokeWidth={3} />}
-        </span>
-      </span>
-    </button>
-  )
-}
 
 function ExtraBadges({ row }: { row: FixedExpenseRow }) {
   return (
@@ -59,17 +34,20 @@ function ExtraBadges({ row }: { row: FixedExpenseRow }) {
       )}
       {row.installments_left !== null && (
         <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">
-          {row.installments_left === 0 ? 'son taksit' : `${row.installments_left} taksit kaldı`}
+          {/* Kalan sayı bu döngününkini de içerir: 1 = son taksit. */}
+          {row.installments_left === 0 ? 'taksit bitti' : row.installments_left === 1 ? 'son taksit' : `${row.installments_left} taksit kaldı`}
         </span>
       )}
+      {!row.recurring && <OneOffBadge />}
     </>
   )
 }
 
 export function FixedPage() {
   const [today] = useState(todayIso)
-  const { data, loadError, actionError, pendingIds, togglePaid, save, remove } = useFixed(today)
+  const { data, loadError, actionError, pendingIds, togglePaid, save, remove, toggleReceived, saveIncome, removeIncome } = useFixed(today)
   const [editing, setEditing] = useState<Editing>(null)
+  const [editingIncome, setEditingIncome] = useState<{ row: IncomeRow | null } | null>(null)
 
   const items = useMemo(() => (data ? sortFixed(data.items) : []), [data])
   const totals = useMemo(() => fixedTotals(items), [items])
@@ -79,7 +57,7 @@ export function FixedPage() {
   if (!data)
     return (
       <>
-        <PageHeader title="Sabit Giderler" />
+        <PageHeader title="Gelir ve Sabit Giderler" />
         <Card>
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {loadErrorText('veriler', loadError ?? '')}
@@ -101,10 +79,7 @@ export function FixedPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <PageHeader title="Sabit Giderler" subtitle={`Ödeme takvimi · ${data.window.label}`} />
-        {items.length > 0 && addButton}
-      </div>
+      <PageHeader title="Gelir ve Sabit Giderler" subtitle={data.window.label} />
 
       {actionError && (
         <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
@@ -112,7 +87,20 @@ export function FixedPage() {
         </p>
       )}
 
-      {/* Özet */}
+      <IncomeSection
+        income={data.income}
+        today={today}
+        pendingIds={pendingIds}
+        onToggle={(row) => void toggleReceived(row)}
+        onEdit={(row) => setEditingIncome({ row })}
+      />
+
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <h2 className="text-lg font-bold tracking-tight">Sabit giderler</h2>
+        {items.length > 0 && addButton}
+      </div>
+
+      {/* Sabit gider özeti */}
       <dl className="grid grid-cols-3 gap-2">
         {(
           [
@@ -223,7 +211,12 @@ export function FixedPage() {
                         {formatEur(row.amount)}
                       </span>
                     </button>
-                    <PaidSwitch row={row} pending={pendingIds.has(row.id)} onToggle={() => void togglePaid(row)} />
+                    <PaidSwitch
+                      checked={row.paid}
+                      label={`${row.item}: ${row.paid ? 'ödendi' : 'ödenecek'}`}
+                      pending={pendingIds.has(row.id)}
+                      onToggle={() => void togglePaid(row)}
+                    />
                   </li>
                 )
               })}
@@ -239,6 +232,15 @@ export function FixedPage() {
           onClose={() => setEditing(null)}
           onSave={save}
           onDelete={remove}
+        />
+      )}
+      {editingIncome && (
+        <IncomeForm
+          existing={editingIncome.row}
+          cycle={data.window}
+          onClose={() => setEditingIncome(null)}
+          onSave={saveIncome}
+          onDelete={removeIncome}
         />
       )}
     </div>

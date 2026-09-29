@@ -98,12 +98,12 @@ describe('dateForDayInCycle', () => {
 
 describe('validateFixedForm', () => {
   const cycle = { start: '2026-09-15', end: '2026-10-14' }
-  const base = { day: '7', item: ' Telekom ', amount: '39,99', card: true, installmentsLeft: '' }
+  const base = { day: '7', item: ' Telekom ', amount: '39,99', card: true, installmentsLeft: '', recurring: true }
 
   it('geçerli form → döngü içi tarih ve sayı', () => {
     expect(validateFixedForm(base, cycle)).toEqual({
       ok: true,
-      value: { date: '2026-10-07', item: 'Telekom', amount: 39.99, installmentsLeft: null },
+      value: { date: '2026-10-07', item: 'Telekom', amount: 39.99, installmentsLeft: null, recurring: true },
     })
   })
 
@@ -113,7 +113,7 @@ describe('validateFixedForm', () => {
   })
 
   it('hatalar alan bazında', () => {
-    const r = validateFixedForm({ day: '40', item: '  ', amount: 'on', card: false, installmentsLeft: '-1' }, cycle)
+    const r = validateFixedForm({ day: '40', item: '  ', amount: 'on', card: false, installmentsLeft: '-1', recurring: true }, cycle)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(['amount', 'day', 'installmentsLeft', 'item'])
   })

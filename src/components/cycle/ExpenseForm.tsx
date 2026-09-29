@@ -4,6 +4,7 @@ import type { ColorLookup } from '../../lib/categoryColors'
 import type { VariableExpenseRow } from '../../lib/database.types'
 import { validateExpenseEdit, type ExpenseEditInput, type ExpenseEditValue } from '../../lib/expenseEdit'
 import { BADGE_TONE_CLASSES, badgeStyle, CategoryDot } from '../CategoryBadge'
+import { formatAmountInput } from '../../lib/format'
 import { inputClass } from '../ui'
 
 interface Props {
@@ -23,7 +24,7 @@ export function ExpenseForm({ row, cycle, categories, colorOf, onClose, onSave, 
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [input, setInput] = useState<ExpenseEditInput>({
     category: row.category,
-    amount: row.amount.toFixed(2).replace('.', ','),
+    amount: formatAmountInput(row.amount),
     date: row.date,
     description: row.description,
   })

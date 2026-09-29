@@ -1,10 +1,12 @@
 /**
- * Sabit giderler ekranının durumu: yükleme, ödendi işaretleme (iyimser),
- * ekle / düzenle / sil. Hesaplar src/lib/fixed.ts'te.
+ * Gelir ve sabit giderler ekranının durumu: yükleme, ödendi / alındı işaretleme
+ * (iyimser), ekle / düzenle / sil. Hesaplar src/lib/fixed.ts ve src/lib/income.ts'te.
  */
 import { useCallback, useEffect, useState } from 'react'
-import type { FixedExpenseRow } from '../../lib/database.types'
+import type { FixedExpenseRow, IncomeRow } from '../../lib/database.types'
 import { createFixed, deleteFixed, loadFixed, updateFixed, type FixedData, type FixedInput } from '../../lib/fixedApi'
+import { withReceived, type IncomeFormValue } from '../../lib/income'
+import { createIncome, deleteIncome, updateIncome } from '../../lib/incomeApi'
 
 const errorText = (e: unknown) =>
   e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : String(e)
@@ -77,5 +79,45 @@ export function useFixed(today: string) {
     setData((d) => (d ? { ...d, items: d.items.filter((i) => i.id !== row.id) } : d))
   }, [])
 
-  return { data, loadError, actionError, pendingIds, togglePaid, save, remove }
+  // ---- Gelir -------------------------------------------------------------
+  const replaceIncome = (row: IncomeRow) =>
+    setData((d) => (d ? { ...d, income: d.income.map((i) => (i.id === row.id ? row : i)) } : d))
+
+  /** Alındı ↔ alınmadı. Ekran hemen güncellenir; yazılamazsa geri alınır. */
+  const toggleReceived = useCallback(async (row: IncomeRow) => {
+    setActionError(null)
+    markPending(row.id, true)
+    setData((d) => (d ? { ...d, income: withReceived(d.income, row.id, !row.received) } : d))
+    try {
+      replaceIncome(await updateIncome(row.id, { received: !row.received }))
+    } catch (e) {
+      replaceIncome(row)
+      setActionError(`“${row.source}” güncellenemedi: ${errorText(e)}`)
+    } finally {
+      markPending(row.id, false)
+    }
+  }, [])
+
+  /** Gelir ekler ya da günceller. Hata fırlatır (form gösterir). */
+  const saveIncome = useCallback(
+    async (existing: IncomeRow | null, value: IncomeFormValue) => {
+      setActionError(null)
+      if (existing) {
+        replaceIncome(await updateIncome(existing.id, value))
+      } else {
+        const row = await createIncome(value)
+        if (!data?.cycle) await reload()
+        else setData((d) => (d ? { ...d, income: [...d.income, row] } : d))
+      }
+    },
+    [data?.cycle, reload],
+  )
+
+  const removeIncome = useCallback(async (row: IncomeRow) => {
+    setActionError(null)
+    await deleteIncome(row.id)
+    setData((d) => (d ? { ...d, income: d.income.filter((i) => i.id !== row.id) } : d))
+  }, [])
+
+  return { data, loadError, actionError, pendingIds, togglePaid, save, remove, toggleReceived, saveIncome, removeIncome }
 }

@@ -48,6 +48,8 @@ export type IncomeRow = {
   amount: number
   received: boolean
   note: string | null
+  /** Her döngüde tekrar eder mi (devirde taşınır)? */
+  recurring: boolean
   created_at: string
 }
 
@@ -61,8 +63,10 @@ export type FixedExpenseRow = {
   paid: boolean
   source: string | null
   note: string | null
-  /** Kalan taksit sayısı; taksit değilse null. */
+  /** Kalan taksit sayısı (bu döngününki dahil); taksit değilse null. */
   installments_left: number | null
+  /** Her döngüde tekrar eder mi (devirde taşınır)? */
+  recurring: boolean
   created_at: string
 }
 
@@ -105,11 +109,11 @@ export interface Database {
     Tables: {
       categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order'>
       cycles: Table<CycleRow, 'key' | 'label' | 'start_date' | 'end_date', Generated | 'is_baseline'>
-      income: Table<IncomeRow, 'cycle_id' | 'date' | 'source' | 'amount', Generated | 'received' | 'note'>
+      income: Table<IncomeRow, 'cycle_id' | 'date' | 'source' | 'amount', Generated | 'received' | 'note' | 'recurring'>
       fixed_expenses: Table<
         FixedExpenseRow,
         'cycle_id' | 'date' | 'item' | 'amount',
-        Generated | 'paid' | 'source' | 'note' | 'installments_left'
+        Generated | 'paid' | 'source' | 'note' | 'installments_left' | 'recurring'
       >
       variable_expenses: Table<
         VariableExpenseRow,

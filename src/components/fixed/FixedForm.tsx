@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { FixedExpenseRow } from '../../lib/database.types'
 import { dateForDayInCycle, isCardSource, nextSource, validateFixedForm, type FixedFormInput } from '../../lib/fixed'
 import type { FixedInput } from '../../lib/fixedApi'
+import { formatAmountInput } from '../../lib/format'
 import { inputClass } from '../ui'
 
 interface Props {
@@ -23,13 +24,14 @@ const errorText = (e: unknown) =>
   e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : String(e)
 
 function initialInput(row: FixedExpenseRow | null): FixedFormInput {
-  if (!row) return { day: '', item: '', amount: '', card: false, installmentsLeft: '' }
+  if (!row) return { day: '', item: '', amount: '', card: false, installmentsLeft: '', recurring: true }
   return {
     day: String(Number(row.date.slice(8, 10))),
     item: row.item,
-    amount: row.amount.toFixed(2).replace('.', ','),
+    amount: formatAmountInput(row.amount),
     card: isCardSource(row.source),
     installmentsLeft: row.installments_left === null ? '' : String(row.installments_left),
+    recurring: row.recurring,
   }
 }
 
@@ -70,6 +72,7 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
         amount: result.value.amount,
         source: nextSource(existing?.source ?? null, input.card),
         installments_left: result.value.installmentsLeft,
+        recurring: result.value.recurring,
       })
       onClose()
     } catch (err) {
@@ -166,7 +169,7 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
             {fieldError('amount')}
           </label>
           <label className="block text-sm font-medium">
-            Kalan taksit
+            Kalan taksit <span className="font-normal text-slate-500 dark:text-slate-400">(bu ay dahil · 1 = son)</span>
             <input
               type="text"
               inputMode="numeric"
@@ -189,6 +192,18 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
             className="size-5 rounded accent-emerald-600"
           />
           Karttan çekiliyor
+        </label>
+        <label className="-mt-2 flex min-h-11 items-center gap-3 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={input.recurring}
+            onChange={(e) => set('recurring', e.target.checked)}
+            className="size-5 rounded accent-emerald-600"
+          />
+          <span>
+            Her ay tekrar eder
+            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">Yeni döngüye otomatik taşınır; taksitte sayı bir azalır.</span>
+          </span>
         </label>
 
         {submitError && (

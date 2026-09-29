@@ -293,6 +293,24 @@ describe('import_data (ornek_veri.json)', () => {
     })
   })
 
+  it('recurring: dosyada yoksa true, false verilirse korunur', async () => {
+    const oneOff = structuredClone(data)
+    oneOff.cycles[1].fixed[0].recurring = false
+    oneOff.cycles[1].income[0].recurring = false
+    await asUser(USER_C, async () => {
+      await db.query(`select public.import_data($1)`, [JSON.stringify(oneOff)])
+      const f = await db.query<{ n: number }>(`select count(*)::int as n from public.fixed_expenses where not recurring`)
+      const i = await db.query<{ n: number }>(`select count(*)::int as n from public.income where not recurring`)
+      expect([f.rows[0].n, i.rows[0].n]).toEqual([1, 1])
+      // Geri yükleme: dosyada alan yoksa hepsi yeniden true olur.
+      await db.query(`select public.import_data($1)`, [JSON.stringify(data)])
+      const all = await db.query<{ n: number }>(
+        `select (select count(*) from public.fixed_expenses where not recurring) + (select count(*) from public.income where not recurring) as n`,
+      )
+      expect(Number(all.rows[0].n)).toBe(0)
+    })
+  })
+
   it('başka kullanıcı sabit gideri ödendi işaretleyemez', async () => {
     // 'Beyaz eşya taksiti' yalnızca USER_C'de var.
     const res = await asUser(USER_A, () =>

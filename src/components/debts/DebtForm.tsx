@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { DebtRow } from '../../lib/database.types'
 import { splitDueDate, validateDebtForm, type DebtFormInput, type DebtFormValue } from '../../lib/debts'
+import { formatAmountInput } from '../../lib/format'
 import { inputClass } from '../ui'
 
 interface Props {
@@ -24,7 +25,7 @@ function initialInput(row: DebtRow | null, suggestedPriority: number): DebtFormI
     return { name: '', balance: '', hasInterest: false, interest: '', dueMonth: '', dueDay: '', priority: String(suggestedPriority), note: '' }
   return {
     name: row.name,
-    balance: row.balance.toFixed(2).replace('.', ','),
+    balance: formatAmountInput(row.balance),
     hasInterest: row.has_interest,
     interest: row.interest ?? '',
     ...splitDueDate(row.due_date),

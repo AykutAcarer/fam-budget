@@ -12,6 +12,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **1. katman:** iskelet, Supabase auth (kayıt/giriş/çıkış), tablolar + RLS, boş dashboard, tema
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
 - [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
+- [x] **Gelir girişi:** Sabit sekmesinde "Gelir" bölümü — toplam / alınan / beklenen, alındı anahtarı, ekle/düzenle/sil, tek seferlik işareti
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
@@ -32,6 +33,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20260929000000_import_data.sql` | JSON içe aktarma fonksiyonu |
      | `20260930000000_accessible_category_colors.sql` | Erişilebilir kategori renkleri + eski pastel renkleri taşıma |
      | `20261001000000_fixed_expense_installments.sql` | Sabit giderlere `installments_left` (kalan taksit) + içe aktarmanın bunu taşıması |
+     | `20261002000000_recurring_and_roll_forward.sql` | Gelir ve sabit giderlere `recurring` (her ay tekrar eder) + içe aktarmanın bunu taşıması |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -229,9 +231,15 @@ grafiğin bugünkü noktasının kıyas kartındaki "bu ay / baz ay" ile aynı o
 - **Harcamalar:** en yeni üstte; kategori, tutar, tarih (döngü içinde) ve açıklama düzenlenir, iki adımlı onayla silinir.
   Yeni harcama buradan girilmez (sohbetten girilir).
 
-## Sabit giderler / ödeme takvimi
+## Gelir ve sabit giderler / ödeme takvimi
 
-*Sabit* sekmesi aktif döngünün sabit giderlerini ödeme gününe göre listeler. Toplamlar (toplam / ödenen / kalan) ve
+*Sabit* sekmesinde iki bölüm vardır: üstte **Gelir** (toplam / alınan / beklenen özeti, gün sıralı liste, alındı anahtarı,
+ekle / düzenle / sil; kaynak için Maaş · Kinderzuschlag · Wohngeld hızlı seçimi ya da serbest metin), altında **Sabit
+giderler**. Gelir toplamları [`src/lib/income.ts`](src/lib/income.ts)'ten gelir; dashboard'daki "Toplam gelir" kartı da aynı
+fonksiyonu kullanır. Gelir ve sabit gider kalemleri "Her ay tekrar eder" (`recurring`) işaretini taşır; kaldırılırsa kalem
+"tek seferlik" rozetiyle gösterilir ve döngü devrinde taşınmaz. Kalan taksit sayısı bu döngününkini de içerir (1 = son taksit).
+
+Sabit gider listesi aktif döngünün sabit giderlerini ödeme gününe göre gösterir. Toplamlar (toplam / ödenen / kalan) ve
 durumlar [`src/lib/fixed.ts`](src/lib/fixed.ts)'ten gelir; dashboard'daki sabit gider KPI'ı da aynı fonksiyonu kullanır.
 
 | Durum | Kural (ödenmemişse) |
@@ -283,6 +291,7 @@ src/
     expensesApi.ts, outbox.ts harcama kaydı + çevrimdışı kuyruk
     transfer.ts               içe aktarma doğrulama / dışa aktarma (saf)
     fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase
+    income.ts, incomeApi.ts   gelir: toplamlar (alınan/beklenen), form (saf, testli) + Supabase
     debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...

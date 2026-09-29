@@ -17,7 +17,7 @@ export function KpiGrid({ summary }: { summary: CycleSummary }) {
   const { income, fixed, variable, creditCard } = summary
   return (
     <div className="grid grid-cols-2 gap-3">
-      <Tile label="Toplam gelir" value={formatEur(income.total)} sub={`Alınan ${formatEur(income.received)}`} />
+      <Tile label="Toplam gelir" value={formatEur(income.total)} sub={`Alınan ${formatEur(income.received)} · Beklenen ${formatEur(income.expected)}`} />
       <Tile label="Sabit gider" value={formatEur(fixed.total)} sub={`Ödenen ${formatEur(fixed.paid)} · Kalan ${formatEur(fixed.remaining)}`} />
       <Tile label="Değişken harcama" value={formatEur(variable)} sub="Bu döngü, bugüne kadar" />
       <Tile label="Kredi kartı ödemesi" value={formatEur(creditCard)} sub="Değişken harcamanın içinde" />

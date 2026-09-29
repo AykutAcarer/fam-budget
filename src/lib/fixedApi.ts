@@ -4,7 +4,7 @@
  */
 import type { CycleWindow } from './cycle'
 import { cycleLabel, cycleWindowFor } from './cycle'
-import type { CycleRow, FixedExpenseRow } from './database.types'
+import type { CycleRow, FixedExpenseRow, IncomeRow } from './database.types'
 import { ensureCycleFor } from './expensesApi'
 import { supabase } from './supabase'
 
@@ -13,6 +13,8 @@ export interface FixedData {
   cycle: CycleRow | null
   window: Pick<CycleWindow, 'label' | 'start' | 'end'>
   items: FixedExpenseRow[]
+  /** Aynı döngünün gelir kalemleri. */
+  income: IncomeRow[]
 }
 
 export async function loadFixed(today: string): Promise<FixedData> {
@@ -26,14 +28,19 @@ export async function loadFixed(today: string): Promise<FixedData> {
     .maybeSingle()
   if (cycleRes.error) throw cycleRes.error
   const cycle = cycleRes.data
-  if (!cycle) return { cycle: null, window: cycleWindowFor(today), items: [] }
+  if (!cycle) return { cycle: null, window: cycleWindowFor(today), items: [], income: [] }
 
-  const itemsRes = await supabase.from('fixed_expenses').select('*').eq('cycle_id', cycle.id).order('date')
+  const [itemsRes, incomeRes] = await Promise.all([
+    supabase.from('fixed_expenses').select('*').eq('cycle_id', cycle.id).order('date'),
+    supabase.from('income').select('*').eq('cycle_id', cycle.id).order('date'),
+  ])
   if (itemsRes.error) throw itemsRes.error
+  if (incomeRes.error) throw incomeRes.error
   return {
     cycle,
     window: { label: cycleLabel(cycle.start_date, cycle.end_date), start: cycle.start_date, end: cycle.end_date },
     items: itemsRes.data,
+    income: incomeRes.data,
   }
 }
 
@@ -43,6 +50,7 @@ export interface FixedInput {
   amount: number
   source: string | null
   installments_left: number | null
+  recurring: boolean
 }
 
 export async function createFixed(input: FixedInput): Promise<FixedExpenseRow> {
@@ -58,7 +66,7 @@ export async function createFixed(input: FixedInput): Promise<FixedExpenseRow> {
 
 export async function updateFixed(
   id: string,
-  patch: Partial<Pick<FixedExpenseRow, 'date' | 'item' | 'amount' | 'source' | 'installments_left' | 'paid'>>,
+  patch: Partial<Pick<FixedExpenseRow, 'date' | 'item' | 'amount' | 'source' | 'installments_left' | 'paid' | 'recurring'>>,
 ): Promise<FixedExpenseRow> {
   const { data, error } = await supabase.from('fixed_expenses').update(patch).eq('id', id).select('*').single()
   if (error) throw error

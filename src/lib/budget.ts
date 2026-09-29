@@ -5,8 +5,9 @@
 import { createColorLookup } from './categoryColors'
 import { compareToBaseline, type Comparison, type ExpenseLike } from './compare'
 import { fixedTotals, type FixedTotals } from './fixed'
+import { incomeTotals, type IncomeTotals } from './income'
 import { repeatInfo, type RepeatInfo } from './repeat'
-import { fromCents, sumMoney, toCents } from './money'
+import { fromCents, toCents } from './money'
 import type { CycleWindow } from './cycle'
 import type { CategoryRow, CycleRow, FixedExpenseRow, IncomeRow, VariableExpenseRow } from './database.types'
 
@@ -76,7 +77,7 @@ export interface CategorySlice {
 }
 
 export interface CycleSummary {
-  income: { total: number; received: number }
+  income: IncomeTotals
   fixed: FixedTotals
   /** Aktif döngünün tüm değişken harcamaları (kredi kartı ödemesi dahil). */
   variable: number
@@ -109,10 +110,7 @@ export function cycleSummary(data: BudgetData, pending: readonly ExpenseLike[] =
     .sort((a, b) => b.amount - a.amount || (meta.get(a.key)?.sort_order ?? 0) - (meta.get(b.key)?.sort_order ?? 0))
 
   return {
-    income: {
-      total: sumMoney(income.map((i) => i.amount)),
-      received: sumMoney(income.filter((i) => i.received).map((i) => i.amount)),
-    },
+    income: incomeTotals(income),
     fixed: fixedTotals(fixed),
     variable: fromCents(totalCents),
     creditCard: fromCents(cents.get(CREDIT_CARD_KEY) ?? 0),

@@ -18,11 +18,11 @@ const ICON: Record<FixedStatus, typeof AlertIcon> = {
   odendi: CheckIcon,
 }
 
-/** Rozet metni: "2 gün gecikti", "Bugün", "Yarın", "3 gün kaldı", "12 gün sonra", "Ödendi". */
-export function statusText(status: FixedStatus, days: number): string {
+/** Rozet metni: "2 gün gecikti", "Bugün", "Yarın", "3 gün kaldı", "12 gün sonra", "Ödendi" (gelirde "Alındı"). */
+export function statusText(status: FixedStatus, days: number, doneLabel = 'Ödendi'): string {
   switch (status) {
     case 'odendi':
-      return 'Ödendi'
+      return doneLabel
     case 'gecikmis':
       return `${-days} gün gecikti`
     case 'bugun':
@@ -34,12 +34,12 @@ export function statusText(status: FixedStatus, days: number): string {
   }
 }
 
-export function StatusBadge({ status, days }: { status: FixedStatus; days: number }) {
+export function StatusBadge({ status, days, doneLabel }: { status: FixedStatus; days: number; doneLabel?: string }) {
   const Icon = ICON[status]
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${STYLE[status]}`}>
       <Icon className="size-3.5" strokeWidth={2.5} />
-      {statusText(status, days)}
+      {statusText(status, days, doneLabel)}
     </span>
   )
 }
