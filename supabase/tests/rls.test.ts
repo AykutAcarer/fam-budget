@@ -226,7 +226,8 @@ describe('import_data (ornek_veri.json)', () => {
     income: data.cycles.reduce((s, c) => s + c.income.length, 0),
     fixed: data.cycles.reduce((s, c) => s + c.fixed.length, 0),
     variable: data.cycles.reduce((s, c) => s + c.variable.length, 0),
-    debts: data.debts.length,
+    // Kredi kartı borç olarak içe aktarılmaz (ana ekran kredi kartı takibine gider).
+    debts: data.debts.filter((d) => !/kredi\s*kart/i.test(d.name)).length,
     categories: 10,
   }
 
@@ -263,16 +264,21 @@ describe('import_data (ornek_veri.json)', () => {
     edited.cycles[1].variable = [{ date: '2026-09-16', category: 'halisaha', description: 'halısaha', amount: 8.25 }]
     edited.cycles[0].isBaseline = false
     edited.cycles[1].isBaseline = true
-    edited.debts[0].balance = 100
+    edited.debts[1].balance = 100 // debts[0] kredi kartı: borç değil, dönem başı borca gider
+    edited.debts[0].balance = 1999.99
     await asUser(USER_C, async () => {
       await db.query(`select public.import_data($1)`, [JSON.stringify(edited)])
       const c = (await counts()).rows[0]
       expect(c.variable).toBe(data.cycles[0].variable.length + 1)
-      expect(c.debts).toBe(data.debts.length)
+      expect(c.debts).toBe(expected.debts)
       const baseline = await db.query<{ key: string }>('select key from public.cycles where is_baseline')
       expect(baseline.rows.map((r) => r.key)).toEqual(['2026-09'])
-      const debt = await db.query<{ balance: string }>('select balance from public.debts where name = $1', [data.debts[0].name])
+      const debt = await db.query<{ balance: string }>('select balance from public.debts where name = $1', [data.debts[1].name])
       expect(debt.rows[0].balance).toBe('100.00')
+      // Kredi kartı Borçlar'da yok; dosyadaki en yeni döngünün dönem başı borcu oldu
+      expect((await db.query('select 1 from public.debts where name ~* $1', ['kredi[[:space:]]*kart'])).rows).toEqual([])
+      const cc = await db.query<{ key: string; cc: string }>('select key, cc_opening_balance::text as cc from public.cycles order by start_date')
+      expect(cc.rows).toEqual([{ key: '2026-08', cc: '0.00' }, { key: '2026-09', cc: '1999.99' }])
     })
   })
 

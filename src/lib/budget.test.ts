@@ -8,7 +8,7 @@ const cat = (key: string, color: string, sort_order: number): CategoryRow => ({
   is_cuttable: DEFAULT_CUT.includes(key), created_at: '',
 })
 const cycle = (id: string, start: string, end: string): CycleRow => ({
-  id, user_id: 'u', key: id, label: id, start_date: start, end_date: end, is_baseline: id === 'b', created_at: '',
+  id, user_id: 'u', key: id, label: id, start_date: start, end_date: end, is_baseline: id === 'b', cc_opening_balance: 0, created_at: '',
 })
 const v = (date: string, category: string, amount: number): VariableExpenseRow => ({
   id: `${date}${category}${amount}`, user_id: 'u', cycle_id: 'a', date, category, description: '', amount, created_at: '',

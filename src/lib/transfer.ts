@@ -68,6 +68,8 @@ export interface FileCycle {
   start: string
   end: string
   isBaseline: boolean
+  /** Kredi kartı dönem başı borcu (isteğe bağlı; eski dosyalarda yok → 0 / mevcut değer korunur). */
+  ccOpeningBalance?: number
   income: FileIncome[]
   fixed: FileFixed[]
   variable: FileVariable[]
@@ -286,6 +288,8 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
         variable.push({ date, category, description: r.text(x, 'description', q, { fallback: '' }) ?? '', amount })
     })
 
+    const ccOpeningBalance = c.ccOpeningBalance === undefined || c.ccOpeningBalance === null ? undefined : r.amount(c, 'ccOpeningBalance', p)
+
     if (id && start && end) {
       cycles.push({
         id,
@@ -293,6 +297,7 @@ export function normalizeImport(raw: unknown, knownCategoryKeys: Iterable<string
         start,
         end,
         isBaseline: r.bool(c, 'isBaseline'),
+        ...(ccOpeningBalance !== undefined ? { ccOpeningBalance } : {}),
         income,
         fixed,
         variable,
@@ -353,6 +358,7 @@ export function buildExport(rows: ExportRows, generatedAt: string): BudgetFile {
         start: c.start_date,
         end: c.end_date,
         isBaseline: c.is_baseline,
+        ...(Number(c.cc_opening_balance ?? 0) > 0 ? { ccOpeningBalance: Number(c.cc_opening_balance) } : {}),
         income: perCycle(rows.income, c.id).map((x) => ({
           date: x.date,
           source: x.source,

@@ -22,12 +22,10 @@ const errorText = (e: unknown) =>
 
 function initialInput(row: DebtRow | null, suggestedPriority: number): DebtFormInput {
   if (!row)
-    return { name: '', balance: '', hasInterest: false, interest: '', dueMonth: '', dueDay: '', priority: String(suggestedPriority), note: '' }
+    return { name: '', balance: '', dueMonth: '', dueDay: '', priority: String(suggestedPriority), note: '' }
   return {
     name: row.name,
     balance: formatAmountInput(row.balance),
-    hasInterest: row.has_interest,
-    interest: row.interest ?? '',
     ...splitDueDate(row.due_date),
     priority: String(row.priority),
     note: row.note ?? '',
@@ -110,7 +108,7 @@ export function DebtForm({ existing, suggestedPriority, onClose, onSave, onDelet
 
         <label className="block text-sm font-medium">
           Kime / ne
-          <input type="text" value={input.name} onChange={(e) => set('name', e.target.value)} {...aria('name')} className={inputClass} placeholder="ör. Kredi kartı" maxLength={80} />
+          <input type="text" value={input.name} onChange={(e) => set('name', e.target.value)} {...aria('name')} className={inputClass} placeholder="ör. Annemlere" maxLength={80} />
           {err('name')}
         </label>
 
@@ -127,17 +125,6 @@ export function DebtForm({ existing, suggestedPriority, onClose, onSave, onDelet
         </div>
         {err('priority')}
         {existing && <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">Ödeme yaptıysan kartın altındaki “Ödeme ekle”yi kullan — bakiye düşer ve geçmişte görünür. Burayı yalnız düzeltme için değiştir.</p>}
-
-        <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
-          <input type="checkbox" checked={input.hasInterest} onChange={(e) => set('hasInterest', e.target.checked)} className="size-5 rounded accent-emerald-600" />
-          Faizli borç
-        </label>
-        {input.hasInterest && (
-          <label className="-mt-2 block text-sm font-medium">
-            Faiz
-            <input type="text" value={input.interest} onChange={(e) => set('interest', e.target.value)} className={inputClass} placeholder="ör. ~%17,5/yıl" maxLength={40} />
-          </label>
-        )}
 
         <div className="grid grid-cols-[1fr_6rem] gap-3">
           <label className="block text-sm font-medium">

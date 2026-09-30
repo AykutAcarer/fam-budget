@@ -113,7 +113,7 @@ describe('buildExport', () => {
       const cycleId = id()
       rows.cycles.push({
         id: cycleId, user_id: userId, key: c.id, label: c.label, start_date: c.start, end_date: c.end,
-        is_baseline: c.isBaseline, created_at: '',
+        is_baseline: c.isBaseline, cc_opening_balance: c.ccOpeningBalance ?? 0, created_at: '',
       })
       for (const x of [...c.income].reverse())
         rows.income.push({ ...x, id: id(), user_id: userId, cycle_id: cycleId, note: x.note ?? null, recurring: x.recurring ?? true, created_at: '' })
@@ -153,5 +153,24 @@ describe('kategori anahtar kelimeleri', () => {
     const rows = (keywords: string[]): ExportRows => ({ categories: [row(keywords)], debts: [], cycles: [], income: [], fixed: [], variable: [] })
     expect(buildExport(rows(['fitness']), 'x').categories).toEqual([{ ...spor, keywords: ['fitness'] }])
     expect(buildExport(rows([]), 'x').categories).toEqual([spor])
+  })
+})
+
+describe('kredi kartı dönem başı borcu (ccOpeningBalance)', () => {
+  const cyc = (extra: object = {}) => ({ id: '2026-09', label: 'x', start: '2026-09-15', end: '2026-10-14', income: [], fixed: [], variable: [], ...extra })
+
+  it('isteğe bağlı: eski dosyada yoksa alan hiç oluşmaz; varsa sayı olarak okunur', () => {
+    expect(normalizeImport({ cycles: [cyc()] }).data.cycles[0]).not.toHaveProperty('ccOpeningBalance')
+    expect(normalizeImport({ cycles: [cyc({ ccOpeningBalance: '6026,31' })] }).data.cycles[0].ccOpeningBalance).toBe(6026.31)
+    expect(problemsOf({ cycles: [cyc({ ccOpeningBalance: -5 })] })).toEqual(['cycles[0].ccOpeningBalance: negatif olamaz'])
+  })
+
+  it('dışa aktarmada yalnız 0\'dan büyükse yazılır', () => {
+    const row = (cc: number) => ({
+      id: 'c', user_id: 'u', key: '2026-09', label: 'x', start_date: '2026-09-15', end_date: '2026-10-14', is_baseline: false, cc_opening_balance: cc, created_at: '',
+    })
+    const rows = (cc: number): ExportRows => ({ categories: [], debts: [], cycles: [row(cc)], income: [], fixed: [], variable: [] })
+    expect(buildExport(rows(5726.31), 'x').cycles[0].ccOpeningBalance).toBe(5726.31)
+    expect(buildExport(rows(0), 'x').cycles[0]).not.toHaveProperty('ccOpeningBalance')
   })
 })

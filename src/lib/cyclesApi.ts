@@ -15,6 +15,12 @@ export function loadCycles(): Promise<CycleRow[]> {
   return cachedLoad('cycles', fetchCycles)
 }
 
+/** Kredi kartı: döngünün dönem başı borcunu elle düzeltir. */
+export async function setCcOpeningBalance(cycleId: string, amount: number): Promise<void> {
+  const { error } = await supabase.from('cycles').update({ cc_opening_balance: amount }).eq('id', cycleId)
+  if (error) throw error
+}
+
 /** Baz ayı tek işlemde değiştirir (eski baz ay otomatik kalkar). */
 export async function setBaselineCycle(id: string): Promise<void> {
   const { error } = await supabase.rpc('set_baseline_cycle', { p_cycle_id: id })

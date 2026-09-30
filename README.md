@@ -14,7 +14,8 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil; "Her Ay Düzenli Ödenenler" ve "Taksitler" ayrı bölümler (kendi toplamlarıyla), taksitte kalan sayı ve tahmini bitiş
 - [x] **Gelir girişi:** Sabit sekmesinde "Gelir" bölümü — toplam / alınan / beklenen, alındı anahtarı, ekle/düzenle/sil, tek seferlik işareti
 - [x] **Döngü devri:** her ayın 15'inde yeni döngü tekrar eden gelir ve sabit giderlerle otomatik başlar; taksitler bir azalır
-- [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
+- [x] **Borçlar:** faizsiz aile borçları, tek düz liste (öncelik sırası), toplam, vade uyarısı, ekle/düzenle/sil
+- [x] **Kredi kartı takibi (ana ekran):** dönem başı borç · bu dönem ödenen · kalan borç; elle düzeltme; borç döngüden döngüye devreder
 - [x] **Borç ödeme geçmişi:** ödeme ekle (tarih, tutar, not) → bakiye aynı işlemde düşer; geçmiş + toplam ödenen; düzenle/sil bakiyeyi düzeltir
 - [x] **Döngü detay:** döngü seçici, gün gün kümülatif grafik (bu döngü vs baz ay), kategori özeti, harcama düzenle/sil
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
@@ -43,6 +44,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20261005000000_chat_messages.sql` | Sohbet geçmişi tablosu `chat_messages` (RLS) — cihazlar arası sohbet |
      | `20261006000000_cuttable_categories.sql` | Kategorilere `is_cuttable` (kısılabilir mi — kullanıcı seçer); mevcut kullanıcılarda kahvaltı, iş, halı saha, sosyal işaretlenir |
      | `20261007000000_fixed_kind.sql` | Sabit giderlere `fixed_kind` (`duzenli` / `taksit`; kalan taksiti olanlar taksit olarak işaretlenir), devir ve içe aktarma tipe göre |
+     | `20261008000000_credit_card_tracking.sql` | Döngülere `cc_opening_balance` (kredi kartı dönem başı borcu); kredi kartı borç kaydı bu döngüye taşınıp Borçlar'dan silinir; devir borcu taşır; içe aktarmada `ccOpeningBalance` |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -325,11 +327,11 @@ Gün girildiğinde döngü içindeki tarihe yerleşir (15 Eyl – 14 Eki döngü
 ## Borçlar
 
 *Borçlar* sekmesi toplamları ve sıralamayı [`src/lib/debts.ts`](src/lib/debts.ts)'ten alır (dashboard'daki "Toplam borç"
-kartı da aynı fonksiyonu kullanır).
+kartı da aynı fonksiyonu kullanır). Borçlar faizsiz aile borçlarıdır; **faizli/faizsiz ayrımı yoktur.** Kredi kartı burada
+değil, ana ekrandaki kredi kartı bölümünde takip edilir (bkz. *Kredi kartı takibi*). `debts.interest` / `has_interest`
+sütunları veritabanında duruyor (JSON dosya biçimi değişmesin diye) ama hiçbir ekranda ve hesapta kullanılmaz.
 
-- **Sıralama:** faizliler önce, faiz metninden okunan orana göre yüksekten düşüğe ("~%17,5/yıl" → 17,5; okunamazsa sona);
-  sonra faizsizler öncelik numarasına göre. Eşitlikte öncelik, sonra yüksek bakiye, sonra ad.
-- **"Önce bunu öde":** listede en üstteki (en pahalı) kapanmamış faizli borç. Tüm faizliler kırmızı vurgulanır.
+- **Sıralama:** öncelik numarası (küçük önce); eşitlikte yüksek bakiye, sonra ad.
 - **Vade:** `YYYY-MM-DD` ya da yalnız ay (`YYYY-MM`, hesapta ayın ilk günü sayılır). Bugünden 0–30 gün içindeyse
   "vade yaklaşıyor", geçmişse "vadesi geçti".
 - Bakiye Türkçe biçimde girilir ("6.026,31").
@@ -339,6 +341,26 @@ kartı da aynı fonksiyonu kullanır).
   geri ekler; tutarı düzenlemek farkı yansıtır. Tutarlar sent cinsinden hesaplanır
   ([`debtPayments.ts`](src/lib/debtPayments.ts)); testler `supabase/tests/debt-payments.test.ts`.
   Borç formunda bakiyeyi elle değiştirmek hâlâ mümkündür (düzeltme için). Ödeme geçmişi JSON dışa aktarmaya dahil değildir.
+
+## Kredi kartı takibi (ana ekran)
+
+Ana ekrandaki "Kredi kartı ödemesi" kartı ([`CreditCardCard`](src/components/dashboard/CreditCardCard.tsx),
+hesap [`src/lib/creditCard.ts`](src/lib/creditCard.ts)):
+
+- **Dönem başı borç:** `cycles.cc_opening_balance` — döngünün başındaki kredi kartı borcu. "Düzenle" ile elle düzeltilir
+  (ekstre geldiğinde, karta yeni harcama/faiz eklendiğinde). Karta gelen otomatik harcamalar kendiliğinden eklenmez.
+- **Bu dönem ödenen:** bu döngüdeki "kredi karti" kategorisindeki harcamaların toplamı (cihazda bekleyenler dahil).
+  Sohbette "kredi kartı 300 ödedim" yazınca anında yansır.
+- **Kalan borç:** dönem başı − ödenen (sent hassasiyetinde). Ödenen dönem başını aşarsa kalan 0 gösterilir ve aşan
+  kısım not edilir.
+- **Devir:** yeni döngünün dönem başı borcu = önceki döngünün kalanı (0'ın altına inmez). `roll_forward_cycle` idempotent:
+  iki kez çalışsa da borç bir kez taşınır.
+- **Veri taşıma** (`20261008000000_credit_card_tracking.sql`): adı "kredi kart…" olan borç kaydının bakiyesi bugünkü
+  döngünün dönem başı borcu olur ve kayıt (ödeme geçmişiyle birlikte) Borçlar'dan silinir. Kaydı yoksa 0 başlar.
+- **JSON:** döngülerde isteğe bağlı `ccOpeningBalance`. Eski dosyalar sorunsuz yüklenir: alan yoksa yeni döngüde 0, mevcut
+  döngüde değer korunur; eski dosyadaki "Kredi Kartı" borç kaydı Borçlar'a değil, dosyadaki en yeni döngünün dönem başı
+  borcuna yazılır.
+- Testler: `src/lib/creditCard.test.ts`, `supabase/tests/credit-card.test.ts`.
 
 ## Döngü devri (otomatik yeni döngü)
 
@@ -397,7 +419,8 @@ src/
     income.ts, incomeApi.ts   gelir: toplamlar (alınan/beklenen), form (saf, testli) + Supabase
     rollForward.ts            döngü devri kararı (saf, testli); useCycleRollover açılışta çalıştırır
     offlineCache.ts, useOnline.ts  son görülen veri (IndexedDB, kullanıcıya özel) + bağlantı durumu / salt okunur mod
-    debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
+    debts.ts, debtsApi.ts     borçlar: toplam, sıralama, vade durumu (saf, testli) + Supabase
+    creditCard.ts             kredi kartı: dönem başı / ödenen / kalan, devir (saf, testli)
     debtPayments.ts, debtPaymentsApi.ts  borç ödemeleri: toplam, sınır, form (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
   pages/                      AuthPage, Dashboard, SettingsPage, ...

@@ -1,6 +1,11 @@
 /**
  * Borçlar — saf fonksiyonlar (yan etkisiz, testli).
  * Para toplamları sent cinsinden tam sayıyla yapılır; UI yalnızca gösterir.
+ *
+ * Borçlar faizsiz aile borçlarıdır: faizli/faizsiz ayrımı yoktur. Kredi kartı
+ * borçlardan çıkarıldı; ana ekrandaki kredi kartı takibinde (creditCard.ts).
+ * debts.interest / has_interest sütunları veritabanında duruyor ama hiçbir
+ * hesapta ve ekranda kullanılmıyor.
  */
 import { cycleDay } from './cycle'
 import { clampIsoDate } from './date'
@@ -13,8 +18,6 @@ export const DUE_SOON_DAYS = 30
 export interface DebtLike {
   name: string
   balance: number
-  interest: string | null
-  has_interest: boolean
   due_date: string | null
   priority: number
 }
@@ -25,48 +28,18 @@ export interface DebtLike {
 
 export interface DebtTotals {
   total: number
-  /** Faizli borçların toplamı. */
-  interest: number
-  /** Faizsiz borçların toplamı. */
-  interestFree: number
 }
 
-export function debtTotals(debts: readonly Pick<DebtLike, 'balance' | 'has_interest'>[]): DebtTotals {
-  let interest = 0
-  let free = 0
-  for (const d of debts) {
-    if (d.has_interest) interest += toCents(d.balance)
-    else free += toCents(d.balance)
-  }
-  return { total: fromCents(interest + free), interest: fromCents(interest), interestFree: fromCents(free) }
+export function debtTotals(debts: readonly Pick<DebtLike, 'balance'>[]): DebtTotals {
+  return { total: fromCents(debts.reduce((s, d) => s + toCents(d.balance), 0)) }
 }
 
 // ---------------------------------------------------------------------------
-// Sıralama: faizliler önce (yüksek faiz önce), sonra faizsizler öncelik sırasıyla
+// Sıralama: öncelik numarası (küçük önce)
 // ---------------------------------------------------------------------------
 
-/** Faiz metninden yıllık oranı okur: "~%17,5/yıl" → 17.5, "18%" → 18. Okunamazsa null. */
-export function parseInterestRate(text: string | null | undefined): number | null {
-  if (!text) return null
-  const m = /%\s*(\d+(?:[.,]\d+)?)|(\d+(?:[.,]\d+)?)\s*%/.exec(text)
-  if (!m) return null
-  const n = Number((m[1] ?? m[2]).replace(',', '.'))
-  return Number.isFinite(n) ? n : null
-}
-
-/**
- * Sıralama kuralı:
- *  1. Faizliler önce; kendi içinde oranı yüksek olan önce (oranı okunamayan sona).
- *  2. Faizsizler öncelik numarasına göre (küçük önce).
- *  Eşitlikte: öncelik, sonra bakiye (yüksek önce), sonra ad.
- */
+/** Öncelik (küçük önce); eşitlikte bakiye (yüksek önce), sonra ad. */
 export function compareDebts(a: DebtLike, b: DebtLike): number {
-  if (a.has_interest !== b.has_interest) return a.has_interest ? -1 : 1
-  if (a.has_interest) {
-    const ra = parseInterestRate(a.interest) ?? -1
-    const rb = parseInterestRate(b.interest) ?? -1
-    if (ra !== rb) return rb - ra
-  }
   return a.priority - b.priority || b.balance - a.balance || a.name.localeCompare(b.name, 'tr')
 }
 
@@ -111,8 +84,6 @@ export function dueStatus(due: string | null, today: string): DueStatus {
 export interface DebtFormInput {
   name: string
   balance: string
-  hasInterest: boolean
-  interest: string
   /** 'YYYY-MM' (type="month"), boş = vade yok. */
   dueMonth: string
   /** Ayın günü, boş = yalnız ay. */
@@ -124,8 +95,6 @@ export interface DebtFormInput {
 export interface DebtFormValue {
   name: string
   balance: number
-  has_interest: boolean
-  interest: string | null
   due_date: string | null
   priority: number
   note: string | null
@@ -179,8 +148,6 @@ export function validateDebtForm(input: DebtFormInput): DebtFormResult {
     value: {
       name,
       balance: balance!,
-      has_interest: input.hasInterest,
-      interest: input.hasInterest ? input.interest.trim() || null : null,
       due_date,
       priority,
       note: input.note.trim() || null,

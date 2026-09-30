@@ -40,6 +40,8 @@ export type CycleRow = {
   start_date: string
   end_date: string
   is_baseline: boolean
+  /** Kredi kartı: dönem başı borç (devirle gelir, elle düzeltilebilir). */
+  cc_opening_balance: number
   created_at: string
 }
 
@@ -138,7 +140,7 @@ export interface Database {
   public: {
     Tables: {
       categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order' | 'keywords' | 'is_cuttable'>
-      cycles: Table<CycleRow, 'key' | 'label' | 'start_date' | 'end_date', Generated | 'is_baseline'>
+      cycles: Table<CycleRow, 'key' | 'label' | 'start_date' | 'end_date', Generated | 'is_baseline' | 'cc_opening_balance'>
       income: Table<IncomeRow, 'cycle_id' | 'date' | 'source' | 'amount', Generated | 'received' | 'note' | 'recurring'>
       fixed_expenses: Table<
         FixedExpenseRow,

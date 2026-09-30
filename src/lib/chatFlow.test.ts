@@ -8,7 +8,7 @@ import type { NewExpense } from './outbox'
 const TODAY = '2026-09-17' // aktif döngünün 3. günü
 
 const cycle = (id: string, start: string, end: string, is_baseline = false): CycleRow => ({
-  id, user_id: 'u', key: start.slice(0, 7), label: id, start_date: start, end_date: end, is_baseline, created_at: '',
+  id, user_id: 'u', key: start.slice(0, 7), label: id, start_date: start, end_date: end, is_baseline, cc_opening_balance: 0, created_at: '',
 })
 const expense = (cycle_id: string, date: string, category: string, amount: number): VariableExpenseRow => ({
   id: `${cycle_id}-${date}-${category}`, user_id: 'u', cycle_id, date, category, description: '', amount, created_at: '',

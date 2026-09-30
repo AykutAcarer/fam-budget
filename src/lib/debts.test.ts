@@ -4,7 +4,6 @@ import {
   dueStatus,
   nextPriority,
   parseBalance,
-  parseInterestRate,
   sortDebts,
   splitDueDate,
   validateDebtForm,
@@ -13,24 +12,26 @@ import {
 
 const TODAY = '2026-09-28'
 const d = (name: string, balance: number, over: Partial<DebtLike> = {}): DebtLike => ({
-  name, balance, interest: null, has_interest: false, due_date: null, priority: 100, ...over,
+  name, balance, due_date: null, priority: 100, ...over,
 })
 
 describe('sortDebts', () => {
-  it('faizliler önce (yüksek oran önce), sonra faizsizler öncelik sırasıyla', () => {
+  it('tek düz liste: yalnız öncelik sırası (faiz ayrımı yok)', () => {
     const debts = [
       d('Arkadaş', 750, { priority: 3 }),
-      d('Kredi kartı', 2480.5, { has_interest: true, interest: '~%18/yıl', priority: 1 }),
       d('Ev sahibi', 420, { priority: 2 }),
-      d('Taksitli kredi', 5000, { has_interest: true, interest: '%9,9', priority: 5 }),
       d('Aile büyüğü', 1200, { priority: 4 }),
+      d('Annemler', 5000, { priority: 1 }),
     ]
-    expect(sortDebts(debts).map((x) => x.name)).toEqual(['Kredi kartı', 'Taksitli kredi', 'Ev sahibi', 'Arkadaş', 'Aile büyüğü'])
+    expect(sortDebts(debts).map((x) => x.name)).toEqual(['Annemler', 'Ev sahibi', 'Arkadaş', 'Aile büyüğü'])
   })
 
-  it('faiz oranı okunamayan faizli borç, oranlı faizlilerden sonra ama faizsizlerden önce', () => {
-    const debts = [d('Faizsiz', 1, { priority: 1 }), d('Bilinmeyen faiz', 1, { has_interest: true, interest: 'değişken' }), d('Faizli', 1, { has_interest: true, interest: '12%' })]
-    expect(sortDebts(debts).map((x) => x.name)).toEqual(['Faizli', 'Bilinmeyen faiz', 'Faizsiz'])
+  it('veritabanındaki eski faiz alanları sıralamayı etkilemez', () => {
+    const legacy = [
+      { ...d('Eski faizli', 10, { priority: 5 }), has_interest: true, interest: '%30' },
+      d('Faizsiz', 10, { priority: 1 }),
+    ]
+    expect(sortDebts(legacy).map((x) => x.name)).toEqual(['Faizsiz', 'Eski faizli'])
   })
 
   it('öncelik eşitse yüksek bakiye önce, o da eşitse ada göre', () => {
@@ -46,31 +47,12 @@ describe('sortDebts', () => {
 })
 
 describe('debtTotals', () => {
-  it('toplam = faizli + faizsiz, sent hassasiyetinde', () => {
-    const t = debtTotals([
-      d('KK', 6026.31, { has_interest: true }),
-      d('A', 3000),
-      d('B', 0.1),
-      d('C', 0.2),
-    ])
-    expect(t).toEqual({ total: 9026.61, interest: 6026.31, interestFree: 3000.3 })
+  it('yalnız toplam (faizli/faizsiz ayrımı yok), sent hassasiyetinde', () => {
+    expect(debtTotals([d('A', 3000), d('B', 0.1), d('C', 0.2)])).toEqual({ total: 3000.3 })
   })
 
   it('boş liste', () => {
-    expect(debtTotals([])).toEqual({ total: 0, interest: 0, interestFree: 0 })
-  })
-})
-
-describe('parseInterestRate', () => {
-  it.each([
-    ['~%17,5/yil', 17.5],
-    ['%18', 18],
-    ['18%', 18],
-    ['yıllık % 9.9', 9.9],
-    ['değişken', null],
-    [null, null],
-  ])('%s → %s', (text, rate) => {
-    expect(parseInterestRate(text)).toBe(rate)
+    expect(debtTotals([])).toEqual({ total: 0 })
   })
 })
 
@@ -95,19 +77,17 @@ describe('dueStatus — 30 gün sınırı', () => {
 })
 
 describe('form', () => {
-  const base = { name: ' Kredi Kartı ', balance: '6.026,31', hasInterest: true, interest: ' ~%17,5/yıl ', dueMonth: '', dueDay: '', priority: '1', note: '' }
+  const base = { name: ' Aile büyüğü ', balance: '1.200,50', dueMonth: '', dueDay: '', priority: '1', note: '' }
 
-  it('Türkçe bakiye ve faiz', () => {
+  it('Türkçe bakiye; formda faiz alanı yok', () => {
     expect(validateDebtForm(base)).toEqual({
       ok: true,
-      value: { name: 'Kredi Kartı', balance: 6026.31, has_interest: true, interest: '~%17,5/yıl', due_date: null, priority: 1, note: null },
+      value: { name: 'Aile büyüğü', balance: 1200.5, due_date: null, priority: 1, note: null },
     })
   })
 
-  it('faizsizde faiz metni kaydedilmez; ay veya tam tarih vadesi', () => {
-    expect(validateDebtForm({ ...base, hasInterest: false, dueMonth: '2027-01' })).toMatchObject({
-      ok: true, value: { interest: null, has_interest: false, due_date: '2027-01' },
-    })
+  it('ay veya tam tarih vadesi', () => {
+    expect(validateDebtForm({ ...base, dueMonth: '2027-01' })).toMatchObject({ ok: true, value: { due_date: '2027-01' } })
     expect(validateDebtForm({ ...base, dueMonth: '2027-02', dueDay: '30' })).toMatchObject({ ok: true, value: { due_date: '2027-02-28' } })
   })
 

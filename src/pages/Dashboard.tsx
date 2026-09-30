@@ -12,6 +12,7 @@ import { ChatPanel } from '../components/chat/ChatPanel'
 import { useChat } from '../components/chat/useChat'
 import { CategoryCard } from '../components/dashboard/CategoryCard'
 import { ComparisonCard } from '../components/dashboard/ComparisonCard'
+import { CreditCardCard } from '../components/dashboard/CreditCardCard'
 import { DebtSummaryCard } from '../components/dashboard/DebtSummaryCard'
 import { KpiGrid } from '../components/dashboard/KpiGrid'
 import { Card, Spinner } from '../components/ui'
@@ -22,11 +23,14 @@ import { clampedCycleDay } from '../lib/compare'
 import { loadErrorText } from '../lib/loadError'
 import { useBudgetData } from '../lib/useBudgetData'
 import { cuttableLabels } from '../lib/categories'
+import { setCcOpeningBalance } from '../lib/cyclesApi'
+import { useReadOnly } from '../lib/useOnline'
 
 export function Dashboard() {
   const { session } = useAuth()
   const [today] = useState(todayIso)
   const { data, error, reload } = useBudgetData(today)
+  const readOnly = useReadOnly()
   const chat = useChat({ userId: session!.user.id, today, data, reload })
   const colorOf = useMemo(() => createColorLookup(data?.categories), [data])
 
@@ -104,6 +108,16 @@ export function Dashboard() {
       />
 
       <KpiGrid summary={summary} />
+
+      <CreditCardCard
+        opening={data.active.cycle ? Number(data.active.cycle.cc_opening_balance ?? 0) : null}
+        paid={summary.creditCard}
+        readOnly={readOnly}
+        onSaveOpening={async (amount) => {
+          await setCcOpeningBalance(data.active.cycle!.id, amount)
+          await reload()
+        }}
+      />
 
       <DebtSummaryCard />
 
