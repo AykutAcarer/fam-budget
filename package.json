@@ -13,6 +13,7 @@
     "test:ai": "vitest run supabase/tests/chat-expense.live.test.ts"
   },
   "dependencies": {
+    "@react-pdf/renderer": "^4.9.0",
     "@supabase/supabase-js": "^2.117.2",
     "dayjs": "^1.11.23",
     "react": "^19.3.0",

@@ -42,6 +42,8 @@ describe('cycleSummary', () => {
     expect(s.fixed).toEqual({ total: 957.49, paid: 922.5, remaining: 34.99 })
     expect(s.variable).toBe(190)
     expect(s.creditCard).toBe(150)
+    // Nakit akışı = gelir 2430,10 − sabit 957,49 − değişken 190 (sent hassasiyetinde)
+    expect(s.cashFlow).toBe(1282.61)
   })
 
   it('kategori dağılımı: tutara göre azalan, renkler kategoriden, paylar toplamı 1', () => {
@@ -71,6 +73,7 @@ describe('cycleSummary', () => {
       fixed: { total: 0, paid: 0, remaining: 0 },
       variable: 0,
       creditCard: 0,
+      cashFlow: 0,
       byCategory: [],
     })
   })

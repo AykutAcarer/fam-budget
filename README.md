@@ -22,6 +22,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Ayarlar > Kategoriler:** ekle / düzenle (ad, tür, erişilebilir renk, anahtar kelimeler), harcamaları taşıyıp silme; yedek parser kullanıcının anahtar kelimelerini kullanır
 - [x] **Sohbet geçmişi cihazlar arası:** mesajlar veritabanında (son 50 + "Daha eski mesajlar"); çevrimdışı yazılanlar cihazda bekler, bağlantı gelince kopyasız gönderilir
 - [x] **Çevrimdışı veri gösterimi:** son görülen veri cihazda (IndexedDB, kullanıcıya özel); çevrimdışıyken salt okunur + afiş, çıkışta silinir
+- [x] **PDF raporu:** ana ekrandaki "PDF indir" — bulunulan döngünün raporu (özet, kategori grafiği, ✂ kıyas, kredi kartı, borçlar, sabitler); istemcide, çevrimdışı da
 - [x] **PWA:** ana ekrana eklenebilir, çevrimdışı açılan kabuk, "Yeni sürüm var — Yenile" bildirimi
 
 ## Kurulum
@@ -163,6 +164,28 @@ Ayarlar [`pwa.config.ts`](pwa.config.ts)'te (vite-plugin-pwa / Workbox); güvenl
   `env(safe-area-inset-bottom)` ile güvenli alana oturur. Durum çubuğu rengi (`theme-color`) seçili temanın zeminine eşitlenir.
 - **Yerelde deneme:** `npm run build && npx vite preview` → http://localhost:4173 (SW yalnızca üretim derlemesinde çalışır).
   Chrome DevTools > Application: Manifest ve Service Worker; Network > Offline ile çevrimdışı açılış.
+
+## PDF raporu (Dışa aktar)
+
+Ana ekrandaki **PDF indir** bulunulan döngünün raporunu üretip indirir (`aile-butcesi_2026-09.pdf`). Tamamen istemcide
+[`@react-pdf/renderer`](https://react-pdf.org) ile gerçek bir PDF dosyası üretilir (yazdırma diyaloğu yok); çevrimdışı da
+çalışır.
+
+- **İçerik:** başlık + döngü + oluşturulma zamanı; durum özeti (toplam gelir, sabit gider, değişken harcama, nakit akışı);
+  kategori dağılımı (donut + renkli tablo: tutar, pay); ✂ kısılabilir kıyas (bu ay / baz ayın aynı günü / fark, çubuklar);
+  kredi kartı (dönem başı / ödenen / kalan); borçlar (öncelik sırası); sabit giderler (Her ay düzenli ödenenler · Taksitler,
+  kalan taksit düzeltilmiş gösterimle ve tahmini bitiş). Uzunsa sayfalara taşar; her sayfada alt bilgi (döngü + sayfa no).
+- **Yeni hesap yok:** rapor verisi [`src/lib/report.ts`](src/lib/report.ts) yalnızca uygulamanın seçicilerini çağırır
+  (`cycleSummary`, `buildComparison`, `creditCardStatus`, `sortDebts`/`debtTotals`, `groupFixed`, `installmentBadgeText` …);
+  PDF bileşeni ([`src/pdf/BudgetReportDocument.tsx`](src/pdf/BudgetReportDocument.tsx)) yalnız çizer. Grafikler aynı veriden
+  react-pdf SVG'siyle yeniden çizilir; kategori renkleri uygulamanın renk kaynağından gelir.
+- **Nakit akışı** = toplam gelir − sabit gider − değişken harcama (kredi kartı ödemeleri dahil); `cycleSummary.cashFlow`,
+  ana ekranda da KPI olarak görünür.
+- **Font:** Türkçe harfler için Roboto (normal, kalın, italik) `src/pdf/fonts/` altında, SIL OFL 1.1 (`OFL.txt`). Pakete data
+  URL olarak gömülür: çalışma anında ağ isteği yok. Emoji kullanılmaz (metinlerden de temizlenir).
+- **Çevrimdışı:** react-pdf parçası (~1,9 MB) tembel yüklenir ve service worker precache'indedir
+  (`maximumFileSizeToCacheInBytes` 4 MiB). Borçlar verisi çevrimdışıyken son görülen önbellekten gelir.
+- Testler: `src/pdf/report.test.tsx` (rapor sayıları = seçiciler; Node'da gerçek PDF üretimi, Roboto gömülü, Helvetica yok).
 
 ## Çevrimdışı veri gösterimi
 
@@ -421,8 +444,10 @@ src/
     offlineCache.ts, useOnline.ts  son görülen veri (IndexedDB, kullanıcıya özel) + bağlantı durumu / salt okunur mod
     debts.ts, debtsApi.ts     borçlar: toplam, sıralama, vade durumu (saf, testli) + Supabase
     creditCard.ts             kredi kartı: dönem başı / ödenen / kalan, devir (saf, testli)
+    report.ts                 PDF rapor verisi — yalnız mevcut seçicilerden (saf, testli)
     debtPayments.ts, debtPaymentsApi.ts  borç ödemeleri: toplam, sınır, form (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts
+  pdf/                        PDF raporu: belge (react-pdf), font kaydı (Roboto, gömülü), tema renkleri, indirme
   pages/                      AuthPage, Dashboard, SettingsPage, ...
 pwa.config.ts               PWA manifest + service worker ayarları
 vercel.json                 SPA yönlendirmesi + önbellek başlıkları

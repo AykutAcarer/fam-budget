@@ -41,6 +41,9 @@ export const pwaOptions: Partial<VitePWAOptions> = {
   workbox: {
     // Precache: uygulama kabuğu (build çıktısı) — çevrimdışı açılış için.
     globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+    // PDF raporu parçası (react-pdf + gömülü Roboto fontu) ~1,9 MB: çevrimdışı PDF için
+    // o da precache'e girmeli; Workbox'ın 2 MiB varsayılanı sınırda olduğundan açıkça 4 MiB.
+    maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
     // SPA: navigasyon isteklerinde index.html (react-router istemci tarafında çözer).
     navigateFallback: 'index.html',
     cleanupOutdatedCaches: true,

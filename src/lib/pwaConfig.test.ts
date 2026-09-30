@@ -27,6 +27,10 @@ describe('service worker', () => {
     expect(pwaOptions.workbox?.globPatterns).toEqual(['**/*.{js,css,html,svg,png,webmanifest}'])
   })
 
+  it('büyük PDF parçası da precache kapsamında (çevrimdışı PDF)', () => {
+    expect(pwaOptions.workbox?.maximumFileSizeToCacheInBytes).toBe(4 * 1024 * 1024)
+  })
+
   it('SPA: navigasyon isteklerinde index.html', () => {
     expect(pwaOptions.workbox?.navigateFallback).toBe('index.html')
   })

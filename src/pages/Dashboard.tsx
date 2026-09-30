@@ -24,6 +24,8 @@ import { loadErrorText } from '../lib/loadError'
 import { useBudgetData } from '../lib/useBudgetData'
 import { cuttableLabels } from '../lib/categories'
 import { setCcOpeningBalance } from '../lib/cyclesApi'
+import { loadDebts } from '../lib/debtsApi'
+import { buildReport } from '../lib/report'
 import { useReadOnly } from '../lib/useOnline'
 
 export function Dashboard() {
@@ -31,6 +33,7 @@ export function Dashboard() {
   const [today] = useState(todayIso)
   const { data, error, reload } = useBudgetData(today)
   const readOnly = useReadOnly()
+  const [pdf, setPdf] = useState<'idle' | 'busy' | 'error'>('idle')
   const chat = useChat({ userId: session!.user.id, today, data, reload })
   const colorOf = useMemo(() => createColorLookup(data?.categories), [data])
 
@@ -58,6 +61,20 @@ export function Dashboard() {
     )
   }
 
+  /** Bulunulan döngünün PDF raporu — istemcide, çevrimdışı da (react-pdf tembel yüklenir). */
+  async function exportPdf() {
+    if (!data || pdf === 'busy') return
+    setPdf('busy')
+    try {
+      const [{ exportReportPdf }, debts] = await Promise.all([import('../pdf/exportPdf'), loadDebts()])
+      await exportReportPdf(buildReport({ data, today, debts, pending: chat.outbox }))
+      setPdf('idle')
+    } catch (e) {
+      console.warn('PDF üretilemedi:', e)
+      setPdf('error')
+    }
+  }
+
   const { window } = data.active
   const day = clampedCycleDay(window, today)
   const total = cycleLength(window.start, window.end)
@@ -68,8 +85,26 @@ export function Dashboard() {
     <div className="space-y-4">
       {/* Döngü başlığı */}
       <header>
-        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Aktif döngü</p>
-        <h1 className="text-2xl font-bold tracking-tight">{window.label}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Aktif döngü</p>
+            <h1 className="text-2xl font-bold tracking-tight">{window.label}</h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => void exportPdf()}
+            disabled={pdf === 'busy'}
+            aria-busy={pdf === 'busy'}
+            className="min-h-10 shrink-0 rounded-xl bg-white px-3 text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-slate-900/10 hover:bg-emerald-50 disabled:opacity-60 dark:bg-slate-900 dark:text-emerald-400 dark:ring-white/10 dark:hover:bg-emerald-950/40"
+          >
+            {pdf === 'busy' ? 'Hazırlanıyor…' : 'PDF indir'}
+          </button>
+        </div>
+        {pdf === 'error' && (
+          <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
+            PDF hazırlanamadı. Biraz sonra tekrar dener misin?
+          </p>
+        )}
         <div className="mt-2 flex items-center gap-3">
           <div
             className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"

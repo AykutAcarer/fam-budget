@@ -87,6 +87,11 @@ export interface CycleSummary {
   variable: number
   /** Bu döngüdeki kredi kartı ödemeleri (değişken harcamanın içinde). */
   creditCard: number
+  /**
+   * Nakit akışı = toplam gelir − toplam sabit gider − değişken harcama (kredi kartı
+   * ödemeleri dahil). Pozitif: artı kalıyor; negatif: gelirden fazla çıkış.
+   */
+  cashFlow: number
   /** Kategori dağılımı, tutara göre azalan; harcaması olmayan kategoriler yok. */
   byCategory: CategorySlice[]
 }
@@ -113,11 +118,14 @@ export function cycleSummary(data: BudgetData, pending: readonly ExpenseLike[] =
     }))
     .sort((a, b) => b.amount - a.amount || (meta.get(a.key)?.sort_order ?? 0) - (meta.get(b.key)?.sort_order ?? 0))
 
+  const incomeT = incomeTotals(income)
+  const fixedT = fixedTotals(fixed)
   return {
-    income: incomeTotals(income),
-    fixed: fixedTotals(fixed),
+    income: incomeT,
+    fixed: fixedT,
     variable: fromCents(totalCents),
     creditCard: fromCents(cents.get(CREDIT_CARD_KEY) ?? 0),
+    cashFlow: fromCents(toCents(incomeT.total) - toCents(fixedT.total) - totalCents),
     byCategory,
   }
 }
