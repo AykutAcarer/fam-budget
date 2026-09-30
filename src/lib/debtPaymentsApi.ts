@@ -5,12 +5,15 @@
  */
 import type { DebtPaymentRow, DebtRow } from './database.types'
 import type { PaymentFormValue } from './debtPayments'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
-export async function loadPayments(): Promise<DebtPaymentRow[]> {
-  const { data, error } = await supabase.from('debt_payments').select('*').order('date', { ascending: false })
-  if (error) throw error
-  return data
+export function loadPayments(): Promise<DebtPaymentRow[]> {
+  return cachedLoad('debt-payments', async () => {
+    const { data, error } = await supabase.from('debt_payments').select('*').order('date', { ascending: false })
+    if (error) throw error
+    return data
+  })
 }
 
 async function loadDebt(id: string): Promise<DebtRow> {

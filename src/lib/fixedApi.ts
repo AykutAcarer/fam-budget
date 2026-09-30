@@ -6,6 +6,7 @@ import type { CycleWindow } from './cycle'
 import { cycleLabel, cycleWindowFor } from './cycle'
 import type { CycleRow, FixedExpenseRow, IncomeRow } from './database.types'
 import { ensureCycleFor } from './expensesApi'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
 export interface FixedData {
@@ -17,7 +18,12 @@ export interface FixedData {
   income: IncomeRow[]
 }
 
-export async function loadFixed(today: string): Promise<FixedData> {
+/** Çevrimdışıyken son görülen veri (bkz. offlineCache). */
+export function loadFixed(today: string): Promise<FixedData> {
+  return cachedLoad('fixed', () => fetchFixed(today))
+}
+
+async function fetchFixed(today: string): Promise<FixedData> {
   const cycleRes = await supabase
     .from('cycles')
     .select('*')

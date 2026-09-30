@@ -1,12 +1,18 @@
 /** Döngüler — Supabase işlemleri (RLS: yalnız kullanıcının kendi döngüleri). */
 import type { CycleRow } from './database.types'
 import { rollForwardSource, rollsNeeded } from './rollForward'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
-export async function loadCycles(): Promise<CycleRow[]> {
+async function fetchCycles(): Promise<CycleRow[]> {
   const { data, error } = await supabase.from('cycles').select('*').order('start_date', { ascending: false })
   if (error) throw error
   return data
+}
+
+/** Ekranlar için: çevrimdışıyken son görülen döngüler (bkz. offlineCache). */
+export function loadCycles(): Promise<CycleRow[]> {
+  return cachedLoad('cycles', fetchCycles)
 }
 
 /** Baz ayı tek işlemde değiştirir (eski baz ay otomatik kalkar). */
@@ -22,7 +28,8 @@ export async function setBaselineCycle(id: string): Promise<void> {
  * döngülerden önceyse null (devir yapılmaz).
  */
 export async function rollForwardUntil(date: string): Promise<string | null> {
-  const cycles = await loadCycles()
+  // Devir kararı önbellekten verilmez: çevrimdışıysa hata fırlatır (kuyruk devreye girer).
+  const cycles = await fetchCycles()
   const covering = cycles.find((c) => c.start_date <= date && date <= c.end_date)
   if (covering) return covering.id
   const source = rollForwardSource(cycles, date)

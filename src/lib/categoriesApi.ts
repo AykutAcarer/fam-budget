@@ -2,12 +2,16 @@
 import type { CategoryFormValue } from './categories'
 import { uniqueKey } from './categories'
 import type { CategoryRow } from './database.types'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
-export async function loadCategories(): Promise<CategoryRow[]> {
-  const { data, error } = await supabase.from('categories').select('*').order('sort_order').order('created_at')
-  if (error) throw error
-  return data
+export function loadCategories(): Promise<CategoryRow[]> {
+  return cachedLoad('categories', async () => {
+    const { data, error } = await supabase.from('categories').select('*').order('sort_order').order('created_at')
+    if (error) throw error
+    // keywords sütunu migration'dan önce yoktur; ekranlar her zaman dizi görsün.
+    return data.map((c) => ({ ...c, keywords: c.keywords ?? [] }))
+  })
 }
 
 /** Yeni kategori listenin sonuna eklenir; key etiketten türetilir ve tekildir. */

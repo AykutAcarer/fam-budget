@@ -1,12 +1,18 @@
 /** Sohbet geçmişi — Supabase işlemleri (RLS: yalnız kullanıcının kendi mesajları). */
 import { fromRow, PAGE_SIZE, type ChatMessage, type ChatMessageInsert } from './chatHistory'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
 /**
  * Son mesajlar (eskiden yeniye). `before` verilirse o andan önceki sayfa.
  * hasMore: daha eski mesaj olabilir mi.
  */
-export async function loadMessages(before?: ChatMessage): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+export function loadMessages(before?: ChatMessage): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+  // Son sayfa çevrimdışı gösterim için önbelleğe alınır; eski sayfalar yalnız çevrimiçi.
+  return before ? fetchMessages(before) : cachedLoad('chat:latest', () => fetchMessages())
+}
+
+async function fetchMessages(before?: ChatMessage): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
   let query = supabase
     .from('chat_messages')
     .select('id, role, content, meta, created_at')

@@ -20,6 +20,7 @@ import type { VariableExpenseRow } from '../lib/database.types'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 import { useIsDark } from '../lib/useIsDark'
+import { useReadOnly } from '../lib/useOnline'
 
 const CycleChart = lazy(() => import('../components/cycle/CycleChart'))
 
@@ -52,6 +53,8 @@ function Legend({ hasBaseline }: { hasBaseline: boolean }) {
 }
 
 export function CyclePage() {
+  // Çevrimdışı: döngüler arasında gezilebilir, harcama düzenlenemez.
+  const readOnly = useReadOnly()
   const [today] = useState(todayIso)
   const d = useCycleDetail(today)
   const [editing, setEditing] = useState<VariableExpenseRow | null>(null)
@@ -209,6 +212,7 @@ export function CyclePage() {
                 Bu döngüde henüz harcama yok. Harcamalar ana ekrandaki sohbetten girilir.
               </p>
             ) : (
+              <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
               <ul>
                 {list.map((row) => {
                   const date = dayjs(row.date).locale('tr')
@@ -235,6 +239,7 @@ export function CyclePage() {
                   )
                 })}
               </ul>
+              </fieldset>
             )}
           </Card>
         </>

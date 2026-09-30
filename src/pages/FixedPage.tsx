@@ -20,6 +20,7 @@ import type { FixedExpenseRow, IncomeRow } from '../lib/database.types'
 import { alertItems, daysUntil, fixedStatus, fixedTotals, isCardSource, sortFixed } from '../lib/fixed'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
+import { useReadOnly } from '../lib/useOnline'
 
 type Editing = { row: FixedExpenseRow | null } | null
 
@@ -44,6 +45,8 @@ function ExtraBadges({ row }: { row: FixedExpenseRow }) {
 }
 
 export function FixedPage() {
+  // Çevrimdışı: son görülen veri, salt okunur (fieldset tüm düğme ve alanları kapatır).
+  const readOnly = useReadOnly()
   const [today] = useState(todayIso)
   const { data, loadError, actionError, pendingIds, togglePaid, save, remove, toggleReceived, saveIncome, removeIncome } = useFixed(today)
   const [editing, setEditing] = useState<Editing>(null)
@@ -78,7 +81,7 @@ export function FixedPage() {
   )
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-4 border-0 p-0">
       <PageHeader title="Gelir ve Sabit Giderler" subtitle={data.window.label} />
 
       {actionError && (
@@ -243,6 +246,6 @@ export function FixedPage() {
           onDelete={removeIncome}
         />
       )}
-    </div>
+    </fieldset>
   )
 }

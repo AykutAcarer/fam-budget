@@ -9,6 +9,9 @@ import { cycleOptions, defaultCycleId } from '../../lib/compare'
 import type { CategoryRow, CycleRow, VariableExpenseRow } from '../../lib/database.types'
 import { deleteExpenses, updateExpense } from '../../lib/expensesApi'
 import type { ExpenseEditValue } from '../../lib/expenseEdit'
+import { loadCategories } from '../../lib/categoriesApi'
+import { loadCycles } from '../../lib/cyclesApi'
+import { cachedLoad } from '../../lib/offlineCache'
 import { supabase } from '../../lib/supabase'
 
 const errorText = (e: unknown) =>
@@ -23,15 +26,10 @@ export function useCycleDetail(today: string) {
   const [expenses, setExpenses] = useState<ReadonlyMap<string, VariableExpenseRow[]>>(new Map())
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('cycles').select('*').order('start_date', { ascending: false }),
-      supabase.from('categories').select('*').order('sort_order'),
-    ])
+    Promise.all([loadCycles(), loadCategories()])
       .then(([c, k]) => {
-        if (c.error) throw c.error
-        if (k.error) throw k.error
-        setCycles(c.data)
-        setCategories(k.data)
+        setCycles(c)
+        setCategories(k)
       })
       .catch((e: unknown) => setLoadError(errorText(e)))
   }, [])
@@ -47,8 +45,11 @@ export function useCycleDetail(today: string) {
     let cancelled = false
     Promise.all(
       need.map(async (id) => {
-        const { data, error } = await supabase.from('variable_expenses').select('*').eq('cycle_id', id).order('date')
-        if (error) throw error
+        const data = await cachedLoad(`cycle-expenses:${id}`, async () => {
+          const { data, error } = await supabase.from('variable_expenses').select('*').eq('cycle_id', id).order('date')
+          if (error) throw error
+          return data
+        })
         return [id, data] as const
       }),
     )

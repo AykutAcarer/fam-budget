@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BudgetData } from './budget'
 import { cycleLabel, cycleWindowFor } from './cycle'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
 /** Supabase sonucundan veriyi alır; hata varsa fırlatır. */
@@ -13,7 +14,12 @@ function unwrap<T>(res: { data: T; error: unknown }): T {
   return res.data
 }
 
-export async function loadBudgetData(today: string): Promise<BudgetData> {
+/** Çevrimdışıyken son görülen dashboard verisi (bkz. offlineCache). */
+export function loadBudgetData(today: string): Promise<BudgetData> {
+  return cachedLoad('budget', () => fetchBudgetData(today))
+}
+
+async function fetchBudgetData(today: string): Promise<BudgetData> {
   const [categoriesRes, activeRes, baselineRes] = await Promise.all([
     supabase.from('categories').select('*').order('sort_order'),
     supabase

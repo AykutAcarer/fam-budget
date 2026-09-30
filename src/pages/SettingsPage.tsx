@@ -9,6 +9,7 @@ import { CategoriesCard } from '../components/settings/CategoriesCard'
 import { Card, CardTitle, PageHeader } from '../components/ui'
 import { supabase } from '../lib/supabase'
 import { useTheme, type ThemePref } from '../lib/theme'
+import { useReadOnly } from '../lib/useOnline'
 
 const THEMES: [ThemePref, string][] = [
   ['light', 'Açık'],
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const { session } = useAuth()
   const [theme, setTheme] = useTheme()
   const [signingOut, setSigningOut] = useState(false)
+  const readOnly = useReadOnly()
 
   async function signOut() {
     setSigningOut(true)
@@ -32,9 +34,10 @@ export function SettingsPage() {
       <PageHeader title="Ayarlar" subtitle={session?.user.email} />
 
       <div className="space-y-4">
-        <BaselineCard />
-
-        <CategoriesCard />
+        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-4 border-0 p-0">
+          <BaselineCard />
+          <CategoriesCard />
+        </fieldset>
 
         <Card>
           <CardTitle>Tema</CardTitle>
@@ -58,7 +61,9 @@ export function SettingsPage() {
           </div>
         </Card>
 
-        <DataTransferCard />
+        <fieldset disabled={readOnly} className="m-0 min-w-0 border-0 p-0">
+          <DataTransferCard />
+        </fieldset>
 
         <button
           type="button"

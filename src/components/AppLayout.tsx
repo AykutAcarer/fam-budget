@@ -1,12 +1,15 @@
 /**
  * Oturum açılmış ekranların iskeleti: içerik + altta sabit tab bar.
  * İçerik, açılıştaki döngü devri bittikten sonra gösterilir (useCycleRollover).
+ * Çevrimdışıyken üstte "son görülen veri" afişi çıkar, ekranlar salt okunurdur;
+ * bağlantı gelince ekranlar yeniden kurulur (veri tazelenir).
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { todayIso } from '../lib/cycle'
 import { useCycleRollover } from '../lib/useCycleRollover'
+import { ReadOnlyContext, useOnline } from '../lib/useOnline'
 import { CalendarIcon, CardIcon, ChartIcon, HomeIcon, SettingsIcon } from './icons'
 import { Spinner } from './ui'
 
@@ -22,12 +25,30 @@ export function AppLayout() {
   const { session } = useAuth()
   const [today] = useState(todayIso)
   const ready = useCycleRollover(session!.user.id, today)
+  const online = useOnline()
+  // Bağlantı geri gelince ekranları yeniden kur → veriler sunucudan tazelenir.
+  const [epoch, setEpoch] = useState(0)
+  const wasOnline = useRef(online)
+  useEffect(() => {
+    if (online && !wasOnline.current) setEpoch((n) => n + 1)
+    wasOnline.current = online
+  }, [online])
 
   return (
     <div className="min-h-dvh">
       {/* Alt boşluk: tab bar + güvenli alan (iPhone çentiği). */}
       <main className="mx-auto max-w-2xl px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))]">
-        {ready ? <Outlet /> : <Spinner label="Döngü hazırlanıyor…" />}
+        {!online && (
+          <p
+            role="status"
+            className="sticky top-2 z-30 mb-4 rounded-xl bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950 shadow-sm ring-1 ring-amber-300 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-800"
+          >
+            Çevrimdışısın — son görülen veri. Düzenleme bağlantı gelince açılır; sohbete yazdıkların cihazda bekler.
+          </p>
+        )}
+        <ReadOnlyContext value={!online}>
+          {ready ? <Outlet key={epoch} /> : <Spinner label="Döngü hazırlanıyor…" />}
+        </ReadOnlyContext>
       </main>
 
       <nav

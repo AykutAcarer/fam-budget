@@ -4,9 +4,13 @@
  * Açılışta oturum önce yerelden okunur (çevrimdışı da açılabilsin); çevrimiçiyse
  * ardından Auth sunucusunda doğrulanır. Sunucu oturumu geçersiz sayarsa yerel
  * oturum kapatılır. Ağ hatası oturumu kapatmaz (çevrimdışı kuyruk çalışmaya devam eder).
+ *
+ * Çevrimdışı veri önbelleği (offlineCache) oturumdaki kullanıcıya bağlanır ve
+ * çıkışta tamamen silinir.
  */
 import { isAuthApiError, type Session } from '@supabase/supabase-js'
 import { createContext, use, useEffect, useState, type ReactNode } from 'react'
+import { handleAuthChange, setCacheUser } from '../lib/offlineCache'
 import { supabase, supabaseConfigError } from '../lib/supabase'
 
 interface AuthState {
@@ -23,10 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (supabaseConfigError) return
     supabase.auth.getSession().then(({ data }) => {
+      setCacheUser(data.session?.user.id ?? null)
       setState({ session: data.session, loading: false })
       if (data.session && navigator.onLine) void verifySession()
     })
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => setState({ session, loading: false }))
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      // Çıkışta son görülen veri cihazdan silinir.
+      void handleAuthChange(event, session?.user.id ?? null)
+      setState({ session, loading: false })
+    })
     return () => data.subscription.unsubscribe()
   }, [])
 

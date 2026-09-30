@@ -16,6 +16,7 @@ import { paymentsByDebt } from '../lib/debtPayments'
 import { debtTotals, dueStatus, nextPriority, sortDebts, type DueStatus } from '../lib/debts'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
+import { useReadOnly } from '../lib/useOnline'
 
 /** 'YYYY-MM' → "Ocak 2027", 'YYYY-MM-DD' → "5 Ocak 2027". */
 function formatDue(due: string): string {
@@ -122,6 +123,8 @@ function DebtCard({ debt, payFirst, today, paid, onEdit, onPayments }: CardProps
 }
 
 export function DebtsPage() {
+  // Çevrimdışı: son görülen veri, salt okunur (fieldset tüm düğme ve alanları kapatır).
+  const readOnly = useReadOnly()
   const [today] = useState(todayIso)
   const { debts, payments, loadError, save, remove, savePayment, removePayment } = useDebts()
   const [editing, setEditing] = useState<{ row: DebtRow | null } | null>(null)
@@ -160,7 +163,7 @@ export function DebtsPage() {
   )
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-4 border-0 p-0">
       <div className="flex items-start justify-between gap-3">
         <PageHeader title="Borçlar" subtitle="Faizliler önce, sonra öncelik sırası" />
         {sorted.length > 0 && addButton('Ekle')}
@@ -227,6 +230,6 @@ export function DebtsPage() {
           onDelete={remove}
         />
       )}
-    </div>
+    </fieldset>
   )
 }

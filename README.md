@@ -20,6 +20,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 - [x] **Ayarlar > Baz ay seçimi:** döngü listesi, tek dokunuşla baz ay (`set_baseline_cycle`), hata olursa eski seçime dönüş
 - [x] **Ayarlar > Kategoriler:** ekle / düzenle (ad, tür, erişilebilir renk, anahtar kelimeler), harcamaları taşıyıp silme; yedek parser kullanıcının anahtar kelimelerini kullanır
 - [x] **Sohbet geçmişi cihazlar arası:** mesajlar veritabanında (son 50 + "Daha eski mesajlar"); çevrimdışı yazılanlar cihazda bekler, bağlantı gelince kopyasız gönderilir
+- [x] **Çevrimdışı veri gösterimi:** son görülen veri cihazda (IndexedDB, kullanıcıya özel); çevrimdışıyken salt okunur + afiş, çıkışta silinir
 - [x] **PWA:** ana ekrana eklenebilir, çevrimdışı açılan kabuk, "Yeni sürüm var — Yenile" bildirimi
 
 ## Kurulum
@@ -147,8 +148,9 @@ Ayarlar [`pwa.config.ts`](pwa.config.ts)'te (vite-plugin-pwa / Workbox); güvenl
   `apple-touch-icon.png` 180). İkonlar yer tutucudur; aynı adlarla değiştirilebilir.
 - **Service worker:** yalnızca build çıktısını (JS/CSS/HTML kabuğu, ikonlar) önbelleğe alır; navigasyonlarda `index.html`'e
   düşer. **Kullanıcı verisi hiç önbelleğe alınmaz:** runtime cache yok; Supabase (Auth, REST, Edge Function) başka origin'de
-  olduğu için SW bu isteklere dokunmaz, her zaman ağdan gider. Çevrimdışıyken uygulama açılır, veri ekranları "çevrimdışı"
-  mesajı gösterir; sohbetten girilen harcamalar cihazdaki kuyrukta bekler ve bağlantı gelince gönderilir.
+  olduğu için SW bu isteklere dokunmaz, her zaman ağdan gider. Çevrimdışıyken uygulama açılır ve ekranlar son görülen
+  veriyi gösterir (bkz. *Çevrimdışı veri gösterimi*); sohbetten girilen harcamalar cihazdaki kuyrukta bekler ve bağlantı
+  gelince gönderilir.
 - **Oturum:** açılışta oturum yerelden okunur (çevrimdışı açılabilsin), çevrimiçiyse Auth sunucusunda doğrulanır; sunucu
   geçersiz sayarsa (401/403) yerel oturum kapatılır.
 - **Güncelleme:** `registerType: 'prompt'` — yeni sürüm yüklenince üstte "Yeni sürüm var — Yenile" çıkar; sessiz güncelleme
@@ -157,6 +159,26 @@ Ayarlar [`pwa.config.ts`](pwa.config.ts)'te (vite-plugin-pwa / Workbox); güvenl
   `env(safe-area-inset-bottom)` ile güvenli alana oturur. Durum çubuğu rengi (`theme-color`) seçili temanın zeminine eşitlenir.
 - **Yerelde deneme:** `npm run build && npx vite preview` → http://localhost:4173 (SW yalnızca üretim derlemesinde çalışır).
   Chrome DevTools > Application: Manifest ve Service Worker; Network > Offline ile çevrimdışı açılış.
+
+## Çevrimdışı veri gösterimi
+
+Son görülen veri service worker'da değil, uygulamanın kendi IndexedDB veritabanında (`butcem-offline`) tutulur
+([`src/lib/offlineCache.ts`](src/lib/offlineCache.ts)). Şema değişikliği yoktur.
+
+- **Ne tutulur:** her ekranın çevrimiçi yüklediği veri — dashboard, döngü listesi ve görülen döngülerin harcamaları, sabit
+  giderler + gelir, borçlar + ödemeler, kategoriler, sohbetin son 50 mesajı. Her yüklemede üzerine yazılır.
+- **Kullanıcıya özel:** kayıt anahtarı `[kullanıcı id, veri]`; yalnız oturumdaki kullanıcının kayıtları okunur, başka
+  kullanıcı aynı cihazda oturum açsa bile önceki kullanıcının verisini göremez.
+- **Çıkışta tamamen silinir** (`SIGNED_OUT` → `clearOfflineCache`). Yükleme sürerken çıkış yapılırsa sonuç yazılmaz.
+- **Çevrimdışıyken:** üstte "Çevrimdışısın — son görülen veri" afişi; Sabit, Borçlar, Döngü (harcama düzenleme) ve Ayarlar'ın
+  baz ay / kategori / veri aktarma kartları salt okunurdur (`<fieldset disabled>`). Tema ve çıkış açık kalır. Sohbet
+  çalışmaya devam eder: harcama ve mesajlar cihazda kuyruğa girer.
+- Tarayıcı çevrimiçi sansa da sunucuya ulaşılamazsa (ağ hatası) yine son görülen veri gösterilir; sunucu / yetki hataları
+  önbellekle örtülmez.
+- **Bağlantı gelince** afiş kalkar, ekranlar yeniden kurulur ve veri sunucudan tazelenir; kuyruklar gönderilir.
+- Döngü devri kararı önbellekten verilmez (her zaman sunucudan).
+- Testler: `src/lib/offlineCache.test.ts` (fake-indexeddb ile gerçek IndexedDB kodu: çevrimdışı gösterim, kullanıcı ayrımı,
+  çıkışta silme).
 
 ## Sohbetle harcama girişi — nasıl çalışır
 
@@ -355,6 +377,7 @@ src/
     fixed.ts, fixedApi.ts     sabit giderler: sıralama, toplamlar, durum (saf, testli) + Supabase
     income.ts, incomeApi.ts   gelir: toplamlar (alınan/beklenen), form (saf, testli) + Supabase
     rollForward.ts            döngü devri kararı (saf, testli); useCycleRollover açılışta çalıştırır
+    offlineCache.ts, useOnline.ts  son görülen veri (IndexedDB, kullanıcıya özel) + bağlantı durumu / salt okunur mod
     debts.ts, debtsApi.ts     borçlar: toplamlar, sıralama, vade durumu (saf, testli) + Supabase
     debtPayments.ts, debtPaymentsApi.ts  borç ödemeleri: toplam, sınır, form (saf, testli) + Supabase
     cycle.ts, date.ts, money.ts

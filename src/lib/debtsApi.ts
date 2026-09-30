@@ -3,12 +3,15 @@
  */
 import type { DebtRow } from './database.types'
 import type { DebtFormValue } from './debts'
+import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
 
-export async function loadDebts(): Promise<DebtRow[]> {
-  const { data, error } = await supabase.from('debts').select('*').order('priority')
-  if (error) throw error
-  return data
+export function loadDebts(): Promise<DebtRow[]> {
+  return cachedLoad('debts', async () => {
+    const { data, error } = await supabase.from('debts').select('*').order('priority')
+    if (error) throw error
+    return data
+  })
 }
 
 export async function createDebt(value: DebtFormValue): Promise<DebtRow> {
