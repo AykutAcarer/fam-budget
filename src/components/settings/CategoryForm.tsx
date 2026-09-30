@@ -167,7 +167,10 @@ export function CategoryForm({ existing, categories, onClose, onSave, countExpen
               )
             })}
           </div>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Kısılabilir kategoriler baz ayla kıyaslanır ve tekrar hatırlatması alır.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Tür yalnızca açıklayıcıdır, hesaba girmez. Baz ay kıyasına girmesi için listedeki <b className="font-semibold">✂ Kısılabilir</b>{' '}
+            anahtarını aç.
+          </p>
           {err('type')}
         </fieldset>
 

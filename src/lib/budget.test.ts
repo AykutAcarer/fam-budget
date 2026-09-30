@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildComparison, buildRepeat, cycleSummary, type BudgetData } from './budget'
-import type { CategoryRow, CycleRow, VariableExpenseRow } from './database.types'
+import type { CategoryRow, CategoryType, CycleRow, VariableExpenseRow } from './database.types'
 
 const DEFAULT_CUT = ['kahvalti', 'is', 'halisaha', 'sosyal']
 const cat = (key: string, color: string, sort_order: number): CategoryRow => ({
@@ -120,5 +120,35 @@ describe('buildRepeat', () => {
     expect(buildRepeat(d, '2026-09-18', 'mutfak').hatirlat).toBe(false)
     d.categories = d.categories.map((c) => (c.key === 'mutfak' ? { ...c, is_cuttable: true } : c))
     expect(buildRepeat(d, '2026-09-18', 'mutfak').hatirlat).toBe(true)
+  })
+})
+
+describe('tür (Zorunlu / Esnek / …) yalnız etikettir; hesaplar is_cuttable\'a bakar', () => {
+  const withCategories = (categories: CategoryRow[]): BudgetData => ({ ...data(), categories })
+  const row = (key: string, type: CategoryType, is_cuttable: boolean, sort_order: number): CategoryRow => ({
+    ...cat(key, '#7C4DFF', sort_order), type, is_cuttable,
+  })
+
+  it('türü Esnek (kisilabilir) ama anahtarı kapalı kategori kıyasa girmez; Zorunlu ama anahtarı açık olan girer', () => {
+    const d = withCategories([row('mutfak', 'zorunlu', true, 1), row('sosyal', 'kisilabilir', false, 7), row('kredi karti', 'borc', false, 10)])
+    const c = buildComparison(d, '2026-09-16')!
+    expect(c.kisilabilir).toEqual(['mutfak'])
+    expect(c.dortluBuAy).toBe(30.3) // yalnız mutfak (30,10 + 0,20); sosyal 9,70 dahil değil
+    expect(c.dortluBazAy).toBe(0) // baz aydaki 20 € sosyal
+  })
+
+  it('türler ne olursa olsun kıyas, tekrar hatırlatması ve özet aynı kalır', () => {
+    const base = data()
+    const ALL: CategoryType[] = ['zorunlu', 'kisilabilir', 'yari', 'borc']
+    const snapshot = (d: BudgetData) => ({
+      comparison: buildComparison(d, '2026-09-16', { category: 'sosyal' }),
+      repeat: d.categories.map((c) => buildRepeat(d, '2026-09-16', c.key)),
+      summary: cycleSummary(d),
+    })
+    const expected = snapshot(base)
+    for (let shift = 1; shift < ALL.length; shift++) {
+      const shuffled = { ...base, categories: base.categories.map((c, i) => ({ ...c, type: ALL[(i + shift) % ALL.length] })) }
+      expect(snapshot(shuffled)).toEqual(expected)
+    }
   })
 })

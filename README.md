@@ -248,7 +248,8 @@ tamamen sentetik `ornek_veri.json`'ı kullanır.
 
 ## Kategori yönetimi (Ayarlar > Kategoriler)
 
-- **Ekle / düzenle:** ad, tür (zorunlu / kısılabilir / yarı zorunlu / borç ödemesi), renk ve isteğe bağlı anahtar kelimeler
+- **Ekle / düzenle:** ad, tür (Zorunlu / Esnek / Yarı zorunlu / Borç ödemesi — yalnızca açıklayıcı etiket, hiçbir hesaba
+  girmez; "Esnek"in saklanan değeri tarihsel olarak `kisilabilir`), renk ve isteğe bağlı anahtar kelimeler
   (virgülle). `key` addan üretilir ve kullanıcı içinde tekildir (`spor`, çakışırsa `spor-2` …); ad sonradan değişse de
   `key` sabit kalır (harcamalar ona bağlı). Aynı ad (Türkçe harf / büyük-küçük duyarsız) reddedilir.
 - **Renk erişilebilirliği:** renk açık (#ffffff) ve koyu (#0f172a) zeminde ≥ 3:1 kontrast sağlamalı; sağlamazsa kaydedilmez,
@@ -260,7 +261,8 @@ tamamen sentetik `ornek_veri.json`'ı kullanır.
   Hiçbiri tutmazsa "sosyal", o yoksa ilk kategori. Varsayılan kelimeler tek kaynaktadır (`_shared/categories.ts`).
 - **Yapay zeka:** kategori enum'u kullanıcının gerçek key'lerinden üretilir; ad, anahtar kelimeler ve kısılabilir işareti
   (`kisilabilir: true`) `context.categories` içinde gider (sistem promptu buna göre güncellendi).
-- **Kısılabilir anahtarı:** her satırda; değişiklik hemen görünür, sunucu reddederse geri alınır. Kısılabilir olanlarda
+- **✂ Kısılabilir anahtarı:** kıyasa (ve tekrar hatırlatmasına) hangi kategorilerin gireceğini belirleyen TEK kontrol;
+  türden bağımsızdır. Her satırda; değişiklik hemen görünür, sunucu reddederse geri alınır. Açık olanlarda
   "✂ kısılabilir" rozeti.
 - Saf mantık [`src/lib/categories.ts`](src/lib/categories.ts) (testli); veritabanı testleri `supabase/tests/category-management.test.ts`.
 

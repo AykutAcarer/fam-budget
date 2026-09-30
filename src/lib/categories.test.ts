@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../../supabase/functions/_shared/categories'
 import {
+  CATEGORY_TYPE_LABELS,
+  categoryTypeShort,
   checkCategoryColor,
   cuttableKeys,
   cuttableLabels,
@@ -152,5 +154,14 @@ describe('kısılabilir küme (is_cuttable)', () => {
 
   it('varsayılan kategorilerde kısılabilir dörtlü tek kaynakta tanımlı', () => {
     expect(DEFAULT_CATEGORIES.filter((c) => c.cuttable).map((c) => c.key)).toEqual(['kahvalti', 'is', 'halisaha', 'sosyal'])
+  })
+})
+
+describe('tür etiketleri', () => {
+  it('saklanan değer kisilabilir kalır, kullanıcıya "Esnek" görünür; "Kısılabilir" adlı tür yok', () => {
+    expect(CATEGORY_TYPE_LABELS).toEqual({ zorunlu: 'Zorunlu', kisilabilir: 'Esnek', yari: 'Yarı zorunlu', borc: 'Borç ödemesi' })
+    expect(Object.values(CATEGORY_TYPE_LABELS).some((l) => /kısılabilir/i.test(l))).toBe(false)
+    expect(categoryTypeShort('kisilabilir')).toBe('esnek')
+    expect(categoryTypeShort('bilinmeyen')).toBe('')
   })
 })

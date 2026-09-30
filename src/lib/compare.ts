@@ -175,6 +175,7 @@ export interface CategoryMeta {
 export interface CategoryBreakdownRow {
   key: string
   label: string
+  /** Yalnız görüntü için (Zorunlu / Esnek / …); gruplama `cuttable`'a göredir. */
   type: string
   /** Kullanıcının kısılabilir seçtiği kategori mi? */
   cuttable: boolean
@@ -231,7 +232,7 @@ export function categoryBreakdown(params: {
     return {
       key,
       label: meta.get(key)?.label ?? key,
-      type: meta.get(key)?.type ?? 'kisilabilir',
+      type: meta.get(key)?.type ?? '',
       cuttable: isCuttable(key),
       current: fromCents(c),
       baseline: b === null ? null : fromCents(b),

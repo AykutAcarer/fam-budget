@@ -308,8 +308,23 @@ describe('categoryBreakdown', () => {
     expect(none.total).toBe(115)
   })
 
+  it('gruplama ve toplamlar türden bağımsız (tür yalnız görüntü alanı)', () => {
+    const allEsnek = categories.map((c) => ({ ...c, type: 'kisilabilir' }))
+    const allZorunlu = categories.map((c) => ({ ...c, type: 'zorunlu' }))
+    const strip = (r: ReturnType<typeof categoryBreakdown>) => ({
+      ...r,
+      cuttable: r.cuttable.map(({ type: _t, ...x }) => x),
+      others: r.others.map(({ type: _t, ...x }) => x),
+    })
+    const a = categoryBreakdown({ cuttableKeys: ['mutfak'], selected, baseline, categories: allEsnek })
+    const b = categoryBreakdown({ cuttableKeys: ['mutfak'], selected, baseline, categories: allZorunlu })
+    expect(strip(a)).toEqual(strip(b))
+    // Tümü "Esnek" olsa da yalnız anahtarı açık olan (mutfak) kısılabilir grupta
+    expect(a.cuttable.map((x) => x.key)).toEqual(['mutfak'])
+  })
+
   it('bilinmeyen kategori anahtarı etiket olarak kullanılır', () => {
     const r = categoryBreakdown({ cuttableKeys: CUT, selected: active([e('2026-09-15', 'spor', 5)]), baseline: null, categories })
-    expect(r.others[0]).toMatchObject({ key: 'spor', label: 'spor' })
+    expect(r.others[0]).toMatchObject({ key: 'spor', label: 'spor', type: '', cuttable: false })
   })
 })

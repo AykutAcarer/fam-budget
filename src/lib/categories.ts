@@ -32,11 +32,23 @@ export function cuttableLabels(categories: readonly { key: string; label: string
   return categories.filter((c) => keys.has(c.key)).map((c) => c.label)
 }
 
+/**
+ * Kategori türünün görünen adları. Tür YALNIZCA açıklayıcı bir etikettir; hiçbir
+ * hesaba (kıyas, kategori özeti, tekrar hatırlatması) girmez — onlar `is_cuttable`
+ * anahtarına bakar. Saklanan değer `kisilabilir` tarihsel olarak aynı kalır, ama
+ * anahtarla karışmasın diye kullanıcıya "Esnek" gösterilir.
+ */
 export const CATEGORY_TYPE_LABELS: Readonly<Record<CategoryType, string>> = {
   zorunlu: 'Zorunlu',
-  kisilabilir: 'Kısılabilir',
+  kisilabilir: 'Esnek',
   yari: 'Yarı zorunlu',
   borc: 'Borç ödemesi',
+}
+
+/** Kısa (küçük harf) tür etiketi — tablolarda; bilinmeyen tür için boş. */
+export function categoryTypeShort(type: string): string {
+  const short: Record<CategoryType, string> = { zorunlu: 'zorunlu', kisilabilir: 'esnek', yari: 'yarı', borc: 'borç' }
+  return short[type as CategoryType] ?? ''
 }
 
 /** Formda hazır renkler: doğrulanmış varsayılan palet. */

@@ -92,9 +92,10 @@ export function CategoriesCard() {
           </button>
         )}
       </div>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Düzenlemek için kategoriye dokun.</p>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        Düzenlemek için kategoriye dokun. <b className="font-semibold">Kısılabilir</b> işaretliler ana ekrandaki baz ay kıyasına
-        ve tekrar hatırlatmasına dahil edilir.
+        <b className="font-semibold text-emerald-800 dark:text-emerald-300">✂ Kısılabilir</b> anahtarı açık olanlar ana ekrandaki baz ay
+        kıyasına ve tekrar hatırlatmasına girer. Tür (Zorunlu, Esnek…) yalnızca açıklamadır.
       </p>
       {toggleError && (
         <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300">
@@ -137,13 +138,13 @@ export function CategoriesCard() {
                     )}
                   </span>
                   <span className="block truncate text-xs text-slate-500 dark:text-slate-400">
-                    {CATEGORY_TYPE_LABELS[c.type]}
+                    Tür: {CATEGORY_TYPE_LABELS[c.type] ?? c.type}
                     {c.keywords.length > 0 && ` · ${c.keywords.slice(0, 4).join(', ')}${c.keywords.length > 4 ? ` +${c.keywords.length - 4}` : ''}`}
                   </span>
                 </span>
               </button>
               <span className="flex shrink-0 flex-col items-center">
-                <span aria-hidden className="text-[10px] font-medium text-slate-500 dark:text-slate-400">Kısılabilir</span>
+                <span aria-hidden className="text-[10px] font-medium text-slate-500 dark:text-slate-400">✂ Kısılabilir</span>
                 <PaidSwitch
                   checked={c.is_cuttable}
                   label={`${c.label}: kısılabilir ${c.is_cuttable ? '(kıyasa dahil)' : '(kıyas dışı)'}`}

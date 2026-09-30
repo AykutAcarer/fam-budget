@@ -3,12 +3,11 @@
  * ara toplam. Fark ok + işaret + metinle (yalnız renge dayanmaz).
  * Rakamlar compare.ts'teki categoryBreakdown'dan.
  */
+import { categoryTypeShort } from '../../lib/categories'
 import type { CategoryBreakdown, CategoryBreakdownRow } from '../../lib/compare'
 import type { ColorLookup } from '../../lib/categoryColors'
 import { formatEur, formatSignedEur } from '../../lib/format'
 import { CategoryDot } from '../CategoryBadge'
-
-const TYPE_LABEL: Record<string, string> = { zorunlu: 'zorunlu', kisilabilir: 'kısılabilir', yari: 'yarı', borc: 'borç' }
 
 function Diff({ diff }: { diff: number | null }) {
   if (diff === null) return <span className="text-slate-400 dark:text-slate-500">—</span>
@@ -45,7 +44,7 @@ function Row({ row, colorOf }: { row: CategoryBreakdownRow; colorOf: ColorLookup
           <CategoryDot color={colorOf(row.key)} />
           <span className="min-w-0">
             <span className="block truncate">{row.label}</span>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">{TYPE_LABEL[row.type] ?? row.type}</span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">{categoryTypeShort(row.type)}</span>
           </span>
         </span>
       </th>
