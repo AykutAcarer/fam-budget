@@ -120,9 +120,11 @@ export async function saveAndRespond(
   const { queued } = await deps.saveExpenses(items)
 
   const fresh = queued ? env.data : ((await deps.reload()) ?? env.data)
-  const comparison = fresh
+  const built = fresh
     ? buildComparison(fresh, env.today, { pending: deps.pendingOutbox(), category: items[0]?.category })
     : null
+  // Kısılabilir kategori seçilmemişse kıyas yok sayılır (0'ları cümleye dökmenin anlamı yok).
+  const comparison = built && built.kisilabilir.length > 0 ? built : null
   // Tekrar bilgisi ve hatırlatma kararı kodda; yapay zeka yalnız cümleyi yazar.
   const repeat = fresh && items[0] ? buildRepeat(fresh, env.today, items[0].category, deps.pendingOutbox()) : null
 

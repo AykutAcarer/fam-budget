@@ -1,7 +1,7 @@
 /**
  * Ana Ekran (Dashboard).
  *
- * Aktif döngü + döngü günü, kısılabilir dörtlü kıyas kartı, KPI'lar, kategori
+ * Aktif döngü + döngü günü, kısılabilir harcama kıyas kartı, KPI'lar, kategori
  * dağılımı ve sohbetle harcama girişi. Tüm rakamlar kodla hesaplanır
  * (compare.ts / budget.ts); cihazda bekleyen harcamalar da dahil edilir.
  */
@@ -21,6 +21,7 @@ import { cycleLabel, cycleLength, todayIso } from '../lib/cycle'
 import { clampedCycleDay } from '../lib/compare'
 import { loadErrorText } from '../lib/loadError'
 import { useBudgetData } from '../lib/useBudgetData'
+import { cuttableLabels } from '../lib/categories'
 
 export function Dashboard() {
   const { session } = useAuth()
@@ -34,6 +35,8 @@ export function Dashboard() {
     () => (data ? buildComparison(data, today, { pending: chat.outbox }) : null),
     [data, today, chat.outbox],
   )
+  // Kısılabilir küme kullanıcının seçimi (Ayarlar › Kategoriler); değişince kıyas yeniden hesaplanır.
+  const cutLabels = useMemo(() => (data ? cuttableLabels(data.categories) : []), [data])
 
   if (!data && !error) return <Spinner />
 
@@ -97,6 +100,7 @@ export function Dashboard() {
         day={day}
         baselineLabel={baseline ? cycleLabel(baseline.start_date, baseline.end_date) : null}
         activeIsBaseline={!!baseline && baseline.id === data.active.cycle?.id}
+        cuttableLabels={cutLabels}
       />
 
       <KpiGrid summary={summary} />

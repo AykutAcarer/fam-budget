@@ -41,6 +41,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20261003000000_category_management.sql` | Kategorilere `keywords` (yedek parser anahtar kelimeleri; mevcut varsayılan kategorilere de yazılır), taşı-sil fonksiyonu `delete_category`, içe aktarmada `keywords` |
      | `20261004000000_debt_payments.sql` | Borç ödeme geçmişi tablosu `debt_payments` (RLS) + bakiyeyi aynı işlemde güncelleyen tetikleyici |
      | `20261005000000_chat_messages.sql` | Sohbet geçmişi tablosu `chat_messages` (RLS) — cihazlar arası sohbet |
+     | `20261006000000_cuttable_categories.sql` | Kategorilere `is_cuttable` (kısılabilir mi — kullanıcı seçer); mevcut kullanıcılarda kahvaltı, iş, halı saha, sosyal işaretlenir |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -256,8 +257,10 @@ tamamen sentetik `ornek_veri.json`'ı kullanır.
 - **Yedek parser:** internet / yapay zeka yokken kategori, kullanıcının kategorilerindeki anahtar kelimelerle bulunur
   (kategori sırasıyla; 4+ harfli kelime kelime başında eşleşir — "market" → "marketten"; kısa kelimeler tam kelime).
   Hiçbiri tutmazsa "sosyal", o yoksa ilk kategori. Varsayılan kelimeler tek kaynaktadır (`_shared/categories.ts`).
-- **Yapay zeka:** kategori enum'u kullanıcının gerçek key'lerinden üretilir; ad ve anahtar kelimeler `context.categories`
-  içinde gider (sistem promptu buna göre güncellendi).
+- **Yapay zeka:** kategori enum'u kullanıcının gerçek key'lerinden üretilir; ad, anahtar kelimeler ve kısılabilir işareti
+  (`kisilabilir: true`) `context.categories` içinde gider (sistem promptu buna göre güncellendi).
+- **Kısılabilir anahtarı:** her satırda; değişiklik hemen görünür, sunucu reddederse geri alınır. Kısılabilir olanlarda
+  "✂ kısılabilir" rozeti.
 - Saf mantık [`src/lib/categories.ts`](src/lib/categories.ts) (testli); veritabanı testleri `supabase/tests/category-management.test.ts`.
 
 ## Kategori renkleri
@@ -274,14 +277,14 @@ yeni seed + eski renkleri taşıyan bir migration ekle (örnek: `20260930000000_
 
 ## Döngü detay
 
-*Döngü* sekmesi: döngü seçici (en yeniden eskiye; aktif ve baz ay rozetli), gün gün kümülatif kısılabilir dörtlü grafiği,
+*Döngü* sekmesi: döngü seçici (en yeniden eskiye; aktif ve baz ay rozetli), gün gün kümülatif kısılabilir harcama grafiği,
 kategori özeti ve değişken harcama listesi. Hesaplar [`compare.ts`](src/lib/compare.ts)'te (`cycleOptions`,
-`categoryBreakdown`, `dailyCumulativeSeries`) — dashboard kıyas kartıyla aynı döngü günü ve dörtlü tanımı; bir test,
+`categoryBreakdown`, `dailyCumulativeSeries`) — dashboard kıyas kartıyla aynı döngü günü ve kısılabilir küme; bir test,
 grafiğin bugünkü noktasının kıyas kartındaki "bu ay / baz ay" ile aynı olduğunu doğrular.
 
 - **Grafik:** "Bu döngü" düz yeşil, "Baz ay" kesikli gri (yalnız renkle ayrılmaz). Aktif döngüde çizgi bugünde biter.
   Baz ay yoksa tek çizgi + "baz ay seçili değil" ipucu.
-- **Kategori özeti:** kısılabilir dörtlü ayrı grup + ara toplam; her satırda bu döngü, baz ayın tamamı ve fark (▲/▼ + işaret).
+- **Kategori özeti:** kısılabilir kategoriler ayrı grup + ara toplam; her satırda bu döngü, baz ayın tamamı ve fark (▲/▼ + işaret).
 - **Harcamalar:** en yeni üstte; kategori, tutar, tarih (döngü içinde) ve açıklama düzenlenir, iki adımlı onayla silinir.
   Yeni harcama buradan girilmez (sohbetten girilir).
 
@@ -351,7 +354,11 @@ Beyaz eşya taksiti "6 taksit kaldı".
 
 Döngü takvim ayı değildir: her ayın **15'inde** başlar, ertesi ayın **14'ünde** biter. Döngü günü 1 = 15'i.
 Kıyaslar döngü günü indeksine göre yapılır: bu döngünün 14. günü, baz ayın 14. günüyle karşılaştırılır.
-"Kısılabilir dörtlü" = kahvaltı + iş + halı saha + sosyal. Bkz. [`cycle.ts`](src/lib/cycle.ts), [`compare.ts`](src/lib/compare.ts).
+**Kısılabilir kategoriler:** baz ay kıyasına, döngü grafiğine ve tekrar hatırlatmasına giren kategorileri kullanıcı
+*Ayarlar › Kategoriler*'deki "Kısılabilir" anahtarıyla seçer (`categories.is_cuttable`). Varsayılan: kahvaltı, iş, halı saha,
+sosyal (migration mevcut kullanıcılara da bunu yazar; yeni eklenen kategoriler kısılabilir değildir). Hiçbiri seçili değilse
+kıyas 0'dır ve ekranlar "Kısılabilir kategori seçilmemiş" der; sohbet cevabına kıyas gönderilmez. Motor saf kalır: key
+listesi parametre olarak verilir. Bkz. [`cycle.ts`](src/lib/cycle.ts), [`compare.ts`](src/lib/compare.ts).
 
 ## Proje yapısı
 

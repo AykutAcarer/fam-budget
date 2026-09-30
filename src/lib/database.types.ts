@@ -27,6 +27,8 @@ export type CategoryRow = {
   sort_order: number
   /** Yedek parser anahtar kelimeleri. */
   keywords: string[]
+  /** Kısılabilir mi (baz ay kıyasına ve tekrar hatırlatmasına dahil)? Kullanıcı seçer. */
+  is_cuttable: boolean
   created_at: string
 }
 
@@ -131,7 +133,7 @@ export type ImportSummary = {
 export interface Database {
   public: {
     Tables: {
-      categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order' | 'keywords'>
+      categories: Table<CategoryRow, 'key' | 'label' | 'type' | 'color', Generated | 'sort_order' | 'keywords' | 'is_cuttable'>
       cycles: Table<CycleRow, 'key' | 'label' | 'start_date' | 'end_date', Generated | 'is_baseline'>
       income: Table<IncomeRow, 'cycle_id' | 'date' | 'source' | 'amount', Generated | 'received' | 'note' | 'recurring'>
       fixed_expenses: Table<

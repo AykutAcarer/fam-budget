@@ -5,8 +5,8 @@ import { repeatInfo } from './repeat'
 const TODAY = '2026-09-28'
 const e = (date: string, category: string, amount: number): ExpenseLike => ({ date, category, amount })
 const cycle = (expenses: ExpenseLike[], start = '2026-09-15', end = '2026-10-14') => ({ start, end, expenses })
-const info = (expenses: ExpenseLike[], categoryType = 'kisilabilir', category = 'kahvalti', c = cycle(expenses)) =>
-  repeatInfo({ category, categoryType, today: TODAY, cycle: c })
+const info = (expenses: ExpenseLike[], cuttable = true, category = 'kahvalti', c = cycle(expenses)) =>
+  repeatInfo({ category, cuttable, today: TODAY, cycle: c })
 
 describe('repeatInfo', () => {
   it('3 gün → hatırlatma yok, 4 gün → var (kısılabilir)', () => {
@@ -27,7 +27,7 @@ describe('repeatInfo', () => {
 
   it('pencere döngü başlangıcından öteye gitmez; başka kategoriler sayılmaz', () => {
     const c = cycle([e('2026-09-14', 'kahvalti', 9), e('2026-09-15', 'kahvalti', 1), e('2026-09-16', 'sosyal', 1)], '2026-09-15', '2026-10-14')
-    expect(repeatInfo({ category: 'kahvalti', categoryType: 'kisilabilir', today: '2026-09-17', cycle: c })).toMatchObject({
+    expect(repeatInfo({ category: 'kahvalti', cuttable: true, today: '2026-09-17', cycle: c })).toMatchObject({
       gunSayisi: 1,
       kategoriToplam: 1,
     })
@@ -35,8 +35,8 @@ describe('repeatInfo', () => {
 
   it('zorunlu ve yarı kategorilerde eşik aşılsa da hatırlatma yok', () => {
     const daily = ['2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28'].map((d) => e(d, 'mutfak', 10))
-    expect(info(daily, 'zorunlu', 'mutfak')).toMatchObject({ gunSayisi: 4, hatirlat: false })
-    expect(info(daily.map((x) => ({ ...x, category: 'temizlik' })), 'yari', 'temizlik')).toMatchObject({ hatirlat: false })
+    expect(info(daily, false, 'mutfak')).toMatchObject({ gunSayisi: 4, hatirlat: false })
+    expect(info(daily.map((x) => ({ ...x, category: 'temizlik' })), false, 'temizlik')).toMatchObject({ hatirlat: false })
   })
 
   it('kategori toplamı tüm döngü, sent hassasiyetinde', () => {

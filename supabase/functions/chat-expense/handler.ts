@@ -36,6 +36,8 @@ export interface ChatCategory {
   label: string
   /** Kullanıcının bu kategori için anahtar kelimeleri (eşleştirmede ipucu). */
   keywords?: string[]
+  /** Kullanıcı bu kategoriyi kısılabilir seçmiş mi (baz ay kıyasına dahil)? */
+  kisilabilir?: boolean
 }
 
 export interface ComparisonPayload {
@@ -185,7 +187,12 @@ export function parseChatRequest(body: unknown): ChatRequest | string {
       const keywords = Array.isArray(c.keywords)
         ? c.keywords.filter((k): k is string => typeof k === 'string' && k.trim() !== '').slice(0, 30).map((k) => k.slice(0, 40))
         : []
-      categories.push({ key: c.key, label: typeof c.label === 'string' ? c.label : c.key, ...(keywords.length ? { keywords } : {}) })
+      categories.push({
+        key: c.key,
+        label: typeof c.label === 'string' ? c.label : c.key,
+        ...(keywords.length ? { keywords } : {}),
+        ...(c.kisilabilir === true ? { kisilabilir: true } : {}),
+      })
     }
   }
 

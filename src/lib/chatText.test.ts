@@ -14,6 +14,7 @@ const cmp = (fark: number): Comparison => ({
   dortluBazAy: 120.5 - fark,
   fark,
   kategori: { key: 'halisaha', buAy: 16.5, bazAyTumAy: 33 },
+  kisilabilir: ['kahvalti', 'is', 'halisaha', 'sosyal'],
 })
 const item = { amount: 8.25, category: 'halisaha', date: TODAY, description: 'halısaha' }
 

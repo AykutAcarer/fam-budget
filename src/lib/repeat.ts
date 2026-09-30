@@ -25,12 +25,12 @@ export interface RepeatInfo {
 
 export function repeatInfo(params: {
   category: string
-  /** Kategori tipi ('zorunlu' | 'kisilabilir' | 'yari' | 'borc'). */
-  categoryType: string | undefined
+  /** Kategori kullanıcının kısılabilir seçtiği kategorilerden mi? */
+  cuttable: boolean
   today: string
   cycle: CycleExpenses
 }): RepeatInfo {
-  const { category, categoryType, today, cycle } = params
+  const { category, cuttable, today, cycle } = params
   const windowStart = dayjs(today).subtract(REPEAT_WINDOW_DAYS - 1, 'day').format('YYYY-MM-DD')
   const from = windowStart > cycle.start ? windowStart : cycle.start
   const to = today < cycle.end ? today : cycle.end
@@ -47,6 +47,6 @@ export function repeatInfo(params: {
     gunSayisi: days.size,
     pencereGun: REPEAT_WINDOW_DAYS,
     kategoriToplam: fromCents(cents),
-    hatirlat: categoryType === 'kisilabilir' && days.size >= REPEAT_THRESHOLD_DAYS,
+    hatirlat: cuttable && days.size >= REPEAT_THRESHOLD_DAYS,
   }
 }

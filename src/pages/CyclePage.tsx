@@ -1,6 +1,6 @@
 /**
  * Döngü Detay (codex_prompt.md §6B): döngü seçici, gün gün kümülatif grafik
- * (bu döngü vs baz ay, kısılabilir dörtlü), kategori özeti, değişken harcama
+ * (bu döngü vs baz ay, kısılabilir kategoriler), kategori özeti, değişken harcama
  * listesi (düzenle/sil). Hesaplar compare.ts'te — dashboard kıyas kartıyla aynı.
  */
 import dayjs from 'dayjs'
@@ -21,6 +21,8 @@ import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 import { useIsDark } from '../lib/useIsDark'
 import { useReadOnly } from '../lib/useOnline'
+import { cuttableKeys, cuttableLabels } from '../lib/categories'
+import { NoCuttable } from '../components/NoCuttable'
 
 const CycleChart = lazy(() => import('../components/cycle/CycleChart'))
 
@@ -59,6 +61,8 @@ export function CyclePage() {
   const d = useCycleDetail(today)
   const [editing, setEditing] = useState<VariableExpenseRow | null>(null)
   const colorOf = useMemo(() => createColorLookup(d.categories), [d.categories])
+  const cutKeys = useMemo(() => cuttableKeys(d.categories), [d.categories])
+  const cutLabels = useMemo(() => cuttableLabels(d.categories), [d.categories])
 
   const { selected, baseline, selectedExpenses, baselineExpenses } = d
   // Baz ay seçili döngünün kendisiyse kıyaslanacak başka ay yok.
@@ -69,9 +73,9 @@ export function CyclePage() {
   const baseCycle = compareBase ? { start: compareBase.start_date, end: compareBase.end_date, expenses: baselineExpenses ?? [] } : null
 
   // Küçük veri (bir döngü ≈ 100 kalem): her çizimde hesaplamak yeterince ucuz.
-  const series = ready && selectedCycle ? dailyCumulativeSeries({ selected: selectedCycle, baseline: baseCycle, today }) : []
+  const series = ready && selectedCycle ? dailyCumulativeSeries({ selected: selectedCycle, baseline: baseCycle, today, cuttableKeys: cutKeys }) : []
   const breakdown =
-    ready && selectedCycle ? categoryBreakdown({ selected: selectedCycle, baseline: baseCycle, categories: d.categories }) : null
+    ready && selectedCycle ? categoryBreakdown({ selected: selectedCycle, baseline: baseCycle, categories: d.categories, cuttableKeys: cutKeys }) : null
   const list = useMemo(
     () => [...(selectedExpenses ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)),
     [selectedExpenses],
@@ -155,8 +159,10 @@ export function CyclePage() {
         <>
           {/* Kümülatif grafik */}
           <Card>
-            <CardTitle>Kısılabilir dörtlü · gün gün kümülatif</CardTitle>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Kahvaltı + İş + Halı saha + Sosyal, döngü gününe göre</p>
+            <CardTitle>Kısılabilir harcamalar · gün gün kümülatif</CardTitle>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              {cutLabels.length ? `${cutLabels.join(' + ')}, döngü gününe göre` : <NoCuttable />}
+            </p>
             <Legend hasBaseline={!!compareBase} />
             <div
               className="mt-2"
@@ -192,7 +198,7 @@ export function CyclePage() {
             <p className="mt-0.5 mb-2 text-xs text-slate-500 dark:text-slate-400">
               Bu döngü · baz ayın tamamı ({compareBase ? cycleLabel(compareBase.start_date, compareBase.end_date) : 'yok'})
             </p>
-            {breakdown.dortlu.length + breakdown.others.length === 0 ? (
+            {breakdown.cuttable.length + breakdown.others.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400">Bu döngüde harcama yok.</p>
             ) : (
               <CategorySummaryTable breakdown={breakdown} colorOf={colorOf} />

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_CATEGORIES } from '../../../supabase/functions/_shared/categories'
 import type { BudgetData } from '../../lib/budget'
+import { cuttableKeys } from '../../lib/categories'
 import { parseWithAI, replyWithAI } from '../../lib/chatApi'
 import { interpret, saveAndRespond, type FlowDeps, type FlowEnv, type ItemSource, type PendingConfirm } from '../../lib/chatFlow'
 import {
@@ -147,13 +148,17 @@ export function useChat(params: {
     }
   }, [])
 
-  const categories = useMemo(
-    () =>
-      data?.categories.length
-        ? data.categories.map((c) => ({ key: c.key, label: c.label, ...(c.keywords ? { keywords: c.keywords } : {}) }))
-        : DEFAULT_CATEGORIES.map(({ key, label, keywords }) => ({ key, label, keywords: [...keywords] })),
-    [data],
-  )
+  const categories = useMemo(() => {
+    if (!data?.categories.length)
+      return DEFAULT_CATEGORIES.map(({ key, label, keywords, cuttable }) => ({ key, label, keywords: [...keywords], ...(cuttable ? { kisilabilir: true } : {}) }))
+    const cut = new Set(cuttableKeys(data.categories))
+    return data.categories.map((c) => ({
+      key: c.key,
+      label: c.label,
+      ...(c.keywords ? { keywords: c.keywords } : {}),
+      ...(cut.has(c.key) ? { kisilabilir: true } : {}),
+    }))
+  }, [data])
   const labels = useMemo(() => new Map(categories.map((c) => [c.key, c.label])), [categories])
 
   const dataRef = useRef(data)

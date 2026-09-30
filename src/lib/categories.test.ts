@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CATEGORIES } from '../../supabase/functions/_shared/categories'
 import {
   checkCategoryColor,
+  cuttableKeys,
+  cuttableLabels,
   keywordConflicts,
   parseKeywords,
   PALETTE_SWATCHES,
@@ -124,5 +126,31 @@ describe('yeni kategori → yedek parser', () => {
   it('keywords alanı hiç yoksa (eski veri) varsayılan kelimeler kullanılır; boş liste bilinçlidir', () => {
     expect(fallbackParse('market 12', '2026-09-28', rulesFor([{ key: 'mutfak' }, { key: 'sosyal' }]))).toMatchObject({ category: 'mutfak', matched: true })
     expect(fallbackParse('market 12', '2026-09-28', rulesFor([{ key: 'mutfak', keywords: [] }, { key: 'sosyal' }]))).toMatchObject({ category: 'sosyal', matched: false })
+  })
+})
+
+describe('kısılabilir küme (is_cuttable)', () => {
+  const rows = [
+    { key: 'mutfak', label: 'Mutfak', is_cuttable: false },
+    { key: 'kahvalti', label: 'Kahvaltı', is_cuttable: true },
+    { key: 'spor', label: 'Spor', is_cuttable: true },
+  ]
+
+  it('yalnız işaretli kategoriler, kategori sırasıyla', () => {
+    expect(cuttableKeys(rows)).toEqual(['kahvalti', 'spor'])
+    expect(cuttableLabels(rows)).toEqual(['Kahvaltı', 'Spor'])
+  })
+
+  it('hiçbiri işaretli değilse boş', () => {
+    expect(cuttableKeys(rows.map((r) => ({ ...r, is_cuttable: false })))).toEqual([])
+  })
+
+  it('alan hiç yoksa (migration öncesi) varsayılan dörtlü; kullanıcıda olmayan key eklenmez', () => {
+    expect(cuttableKeys([{ key: 'kahvalti' }, { key: 'mutfak' }, { key: 'sosyal' }])).toEqual(['kahvalti', 'sosyal'])
+    expect(cuttableKeys([])).toEqual([])
+  })
+
+  it('varsayılan kategorilerde kısılabilir dörtlü tek kaynakta tanımlı', () => {
+    expect(DEFAULT_CATEGORIES.filter((c) => c.cuttable).map((c) => c.key)).toEqual(['kahvalti', 'is', 'halisaha', 'sosyal'])
   })
 })

@@ -105,12 +105,12 @@ describe('Anthropic isteği', () => {
         today: TODAY,
         categories: [
           { key: 'sosyal', label: 'Sosyal', keywords: [] },
-          { key: 'spor', label: 'Spor', keywords: ['fitness', 42, ' ', 'yüzme'] },
+          { key: 'spor', label: 'Spor', keywords: ['fitness', 42, ' ', 'yüzme'], kisilabilir: true },
         ],
       },
     })
     const content: string = sentBody().messages[0].content
-    expect(content).toContain('{"key":"spor","label":"Spor","keywords":["fitness","yüzme"]}')
+    expect(content).toContain('{"key":"spor","label":"Spor","keywords":["fitness","yüzme"],"kisilabilir":true}')
     expect(content).toContain('{"key":"sosyal","label":"Sosyal"}')
     expect(content).toContain('context.categories')
   })

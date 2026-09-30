@@ -1,6 +1,6 @@
 /** Kategoriler — Supabase işlemleri (RLS: yalnız kullanıcının kendi kategorileri). */
 import type { CategoryFormValue } from './categories'
-import { uniqueKey } from './categories'
+import { cuttableKeys, uniqueKey } from './categories'
 import type { CategoryRow } from './database.types'
 import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
@@ -9,8 +9,9 @@ export function loadCategories(): Promise<CategoryRow[]> {
   return cachedLoad('categories', async () => {
     const { data, error } = await supabase.from('categories').select('*').order('sort_order').order('created_at')
     if (error) throw error
-    // keywords sütunu migration'dan önce yoktur; ekranlar her zaman dizi görsün.
-    return data.map((c) => ({ ...c, keywords: c.keywords ?? [] }))
+    // keywords / is_cuttable sütunları migration'dan önce yoktur; ekranlar her zaman değer görsün.
+    const cut = new Set(cuttableKeys(data))
+    return data.map((c) => ({ ...c, keywords: c.keywords ?? [], is_cuttable: cut.has(c.key) }))
   })
 }
 
@@ -30,6 +31,13 @@ export async function createCategory(value: CategoryFormValue, existing: readonl
 /** key değişmez (harcamalar key'e bağlı); etiket, tür, renk ve anahtar kelimeler güncellenir. */
 export async function updateCategory(id: string, value: CategoryFormValue): Promise<CategoryRow> {
   const { data, error } = await supabase.from('categories').update(value).eq('id', id).select('*').single()
+  if (error) throw error
+  return data
+}
+
+/** Kategori kısılabilir mi (baz ay kıyasına ve tekrar hatırlatmasına dahil)? */
+export async function setCategoryCuttable(id: string, isCuttable: boolean): Promise<CategoryRow> {
+  const { data, error } = await supabase.from('categories').update({ is_cuttable: isCuttable }).eq('id', id).select('*').single()
   if (error) throw error
   return data
 }

@@ -22,9 +22,15 @@ const baselineVariable = [
   expense('b', '2026-08-17', 'mutfak', 40),
 ]
 
+/** Varsayılan seçim: dört kısılabilir kategori + mutfak (kısılabilir değil). */
+const categoryRows = (['kahvalti', 'is', 'halisaha', 'sosyal', 'mutfak'] as const).map((key, i) => ({
+  id: key, user_id: 'u', key, label: key, type: 'kisilabilir' as const, color: '#7C4DFF', sort_order: i + 1,
+  keywords: [], is_cuttable: key !== 'mutfak', created_at: '',
+}))
+
 function budget(activeVariable: VariableExpenseRow[] = []): BudgetData {
   return {
-    categories: [],
+    categories: categoryRows,
     active: {
       cycle: cycle('a', '2026-09-15', '2026-10-14'),
       window: { label: 'x', start: '2026-09-15', end: '2026-10-14' },
@@ -129,9 +135,19 @@ describe('saveAndRespond', () => {
       dortluBazAy: 19.59,
       fark: -11.34,
       kategori: { key: 'halisaha', buAy: 8.25, bazAyTumAy: 8.25 },
+      kisilabilir: ['kahvalti', 'is', 'halisaha', 'sosyal'],
     })
     expect(saved).toEqual([{ amount: 8.25, category: 'halisaha', date: TODAY, description: 'halısaha' }])
     expect(reply).toEqual({ text: 'Halı saha 8,25 € kaydettim. Baz ayın 11,34 € altındasın 🎯', author: 'ai', queued: false, items })
+  })
+
+  it('kısılabilir kategori seçilmemişse yapay zekaya kıyas gönderilmez, özet kıyassız olur', async () => {
+    const data = { ...budget(), categories: categoryRows.map((c) => ({ ...c, is_cuttable: false })) }
+    const deps = makeDeps({ replyWithAI: vi.fn(async () => 'Halı saha 8,25 € kaydettim.'), reload: async () => data })
+    const e = { ...env(), data }
+    const reply = await saveAndRespond('8,25 halısaha', items, 'ai', false, e, deps)
+    expect(deps.replyWithAI.mock.calls[0][2]).toBeNull()
+    expect(reply.text).toBe('Halı saha 8,25 € kaydettim.')
   })
 
   it('yapay zeka uydurma rakam yazarsa kodla üretilen özet gösterilir', async () => {
@@ -186,8 +202,8 @@ describe('saveAndRespond — tekrar hatırlatması', () => {
   const withTypes = (variable: VariableExpenseRow[]): BudgetData => ({
     ...budget(variable),
     categories: [
-      { id: '1', user_id: 'u', key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', sort_order: 4, keywords: [], created_at: '' },
-      { id: '2', user_id: 'u', key: 'mutfak', label: 'Mutfak', type: 'zorunlu', color: '#22A06B', sort_order: 1, keywords: [], created_at: '' },
+      { id: '1', user_id: 'u', key: 'kahvalti', label: 'Kahvaltı', type: 'kisilabilir', color: '#B78C11', sort_order: 4, keywords: [], is_cuttable: true, created_at: '' },
+      { id: '2', user_id: 'u', key: 'mutfak', label: 'Mutfak', type: 'zorunlu', color: '#22A06B', sort_order: 1, keywords: [], is_cuttable: false, created_at: '' },
     ],
   })
   // Bugün 18 Eyl (döngünün 4. günü): 15, 16, 17 Eyl'deki kahvaltılar + bugün kaydedilen → 4 farklı gün.

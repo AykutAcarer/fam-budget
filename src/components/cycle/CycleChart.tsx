@@ -1,5 +1,5 @@
 /**
- * Gün gün kümülatif kısılabilir dörtlü (Recharts, tembel yüklenir).
+ * Gün gün kümülatif kısılabilir harcama (Recharts, tembel yüklenir).
  * "Bu döngü" düz + kalın, "Baz ay" gri + kesikli: çizgiler yalnız renkle ayrılmaz.
  * Değerler compare.ts'teki dailyCumulativeSeries'ten gelir; burada hesap yok.
  */

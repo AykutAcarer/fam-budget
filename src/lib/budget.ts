@@ -2,6 +2,7 @@
  * Dashboard verisi ve ondan türetilen rakamlar — saf fonksiyonlar.
  * Tüm para hesapları kodla (compare.ts / money.ts) yapılır.
  */
+import { cuttableKeys } from './categories'
 import { createColorLookup } from './categoryColors'
 import { compareToBaseline, type Comparison, type ExpenseLike } from './compare'
 import { fixedTotals, type FixedTotals } from './fixed'
@@ -33,7 +34,9 @@ export function activeExpenses(data: BudgetData, pending: readonly ExpenseLike[]
 
 /**
  * Aktif döngü vs baz ay kıyası. Baz ay yoksa ya da aktif döngünün kendisi
- * baz aysa null (kıyaslanacak başka ay yok).
+ * baz aysa null (kıyaslanacak başka ay yok). Kısılabilir küme kullanıcının
+ * kategorilerinden (is_cuttable); hiç seçilmemişse toplamlar 0 ve
+ * `kisilabilir` boş döner.
  */
 export function buildComparison(
   data: BudgetData,
@@ -46,6 +49,7 @@ export function buildComparison(
     active: { start: data.active.window.start, end: data.active.window.end, expenses: activeExpenses(data, opts.pending) },
     baseline: { start: baseline.cycle.start_date, end: baseline.cycle.end_date, expenses: baseline.variable },
     today,
+    cuttableKeys: cuttableKeys(data.categories),
     category: opts.category,
   })
 }
@@ -59,7 +63,7 @@ export function buildRepeat(
 ): RepeatInfo {
   return repeatInfo({
     category,
-    categoryType: data.categories.find((c) => c.key === category)?.type,
+    cuttable: cuttableKeys(data.categories).includes(category),
     today,
     cycle: { start: data.active.window.start, end: data.active.window.end, expenses: activeExpenses(data, pending) },
   })

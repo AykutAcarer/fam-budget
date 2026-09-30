@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { buildComparison, cycleSummary, type BudgetData } from './budget'
+import { buildComparison, buildRepeat, cycleSummary, type BudgetData } from './budget'
 import type { CategoryRow, CycleRow, VariableExpenseRow } from './database.types'
 
+const DEFAULT_CUT = ['kahvalti', 'is', 'halisaha', 'sosyal']
 const cat = (key: string, color: string, sort_order: number): CategoryRow => ({
-  id: key, user_id: 'u', key, label: key.toUpperCase(), type: 'kisilabilir', color, sort_order, keywords: [], created_at: '',
+  id: key, user_id: 'u', key, label: key.toUpperCase(), type: 'kisilabilir', color, sort_order, keywords: [],
+  is_cuttable: DEFAULT_CUT.includes(key), created_at: '',
 })
 const cycle = (id: string, start: string, end: string): CycleRow => ({
   id, user_id: 'u', key: id, label: id, start_date: start, end_date: end, is_baseline: id === 'b', created_at: '',
@@ -84,5 +86,39 @@ describe('buildComparison', () => {
   it('bekleyen kalemler bu aya eklenir', () => {
     const c = buildComparison(data(), '2026-09-16', { pending: [{ date: '2026-09-16', category: 'sosyal', amount: 8.25 }] })
     expect(c).toMatchObject({ cycleDay: 2, dortluBuAy: 17.95, dortluBazAy: 20, fark: -2.05 })
+  })
+
+  it('kısılabilir küme kullanıcının seçiminden gelir; seçim değişince kıyas değişir', () => {
+    const d = data()
+    const before = buildComparison(d, '2026-09-16')!
+    // Sosyal'i kısılabilirden çıkar
+    d.categories = d.categories.map((c) => (c.key === 'sosyal' ? { ...c, is_cuttable: false } : c))
+    const after = buildComparison(d, '2026-09-16')!
+    expect(after.kisilabilir).not.toContain('sosyal')
+    expect(after.dortluBuAy).toBeLessThan(before.dortluBuAy)
+  })
+
+  it('hiç kısılabilir kategori yoksa kıyas 0 ve küme boş', () => {
+    const d = data()
+    d.categories = d.categories.map((c) => ({ ...c, is_cuttable: false }))
+    expect(buildComparison(d, '2026-09-16')).toMatchObject({ dortluBuAy: 0, dortluBazAy: 0, fark: 0, kisilabilir: [] })
+  })
+
+  it('is_cuttable alanı hiç yoksa (migration öncesi) varsayılan dörtlü kullanılır', () => {
+    const d = data()
+    d.categories = d.categories.map(({ is_cuttable: _omit, ...c }) => c as CategoryRow)
+    const legacy = buildComparison(d, '2026-09-16')!
+    expect(legacy.kisilabilir.sort()).toEqual(d.categories.map((c) => c.key).filter((k) => DEFAULT_CUT.includes(k)).sort())
+  })
+})
+
+describe('buildRepeat', () => {
+  it('hatırlatma yalnız kısılabilir seçili kategoride', () => {
+    const d = data()
+    const days = ['2026-09-15', '2026-09-16', '2026-09-17', '2026-09-18']
+    d.active = { ...d.active, variable: days.map((day) => v(day, 'mutfak', 5)) }
+    expect(buildRepeat(d, '2026-09-18', 'mutfak').hatirlat).toBe(false)
+    d.categories = d.categories.map((c) => (c.key === 'mutfak' ? { ...c, is_cuttable: true } : c))
+    expect(buildRepeat(d, '2026-09-18', 'mutfak').hatirlat).toBe(true)
   })
 })

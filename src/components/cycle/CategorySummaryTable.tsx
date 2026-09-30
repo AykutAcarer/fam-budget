@@ -1,5 +1,5 @@
 /**
- * Kategori özeti: bu döngü vs baz ay (tüm ay). Kısılabilir dörtlü ayrı grup +
+ * Kategori özeti: bu döngü vs baz ay (tüm ay). Kısılabilir kategoriler ayrı grup +
  * ara toplam. Fark ok + işaret + metinle (yalnız renge dayanmaz).
  * Rakamlar compare.ts'teki categoryBreakdown'dan.
  */
@@ -58,7 +58,7 @@ function Row({ row, colorOf }: { row: CategoryBreakdownRow; colorOf: ColorLookup
 }
 
 export function CategorySummaryTable({ breakdown, colorOf }: { breakdown: CategoryBreakdown; colorOf: ColorLookup }) {
-  const { dortlu, others, dortluTotal } = breakdown
+  const { cuttable, others, cuttableTotal } = breakdown
   return (
     <table className="w-full text-sm">
       <caption className="sr-only">Kategori özeti: bu döngü, baz ay (tüm ay) ve fark</caption>
@@ -69,21 +69,21 @@ export function CategorySummaryTable({ breakdown, colorOf }: { breakdown: Catego
           <th scope="col" className="pb-1 pl-2 text-right font-medium">Fark</th>
         </tr>
       </thead>
-      {dortlu.length > 0 && (
+      {cuttable.length > 0 && (
         <tbody className="bg-emerald-50/60 dark:bg-emerald-950/20">
           <tr>
             <th colSpan={3} scope="rowgroup" className="px-1 pt-2 pb-1 text-left text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-              Kısılabilir dörtlü
+              Kısılabilir kategoriler
             </th>
           </tr>
-          {dortlu.map((r) => (
+          {cuttable.map((r) => (
             <Row key={r.key} row={r} colorOf={colorOf} />
           ))}
           <tr className="border-t border-emerald-200 font-semibold dark:border-emerald-900">
-            <th scope="row" className="py-2 text-left">Dörtlü toplam</th>
-            <Amounts current={dortluTotal.current} baseline={dortluTotal.baseline} strong />
+            <th scope="row" className="py-2 text-left">Kısılabilir toplam</th>
+            <Amounts current={cuttableTotal.current} baseline={cuttableTotal.baseline} strong />
             <td className="py-2 pl-2 text-right text-xs tabular-nums">
-              <Diff diff={dortluTotal.diff} />
+              <Diff diff={cuttableTotal.diff} />
             </td>
           </tr>
         </tbody>

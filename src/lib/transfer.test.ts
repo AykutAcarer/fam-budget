@@ -100,7 +100,7 @@ describe('buildExport', () => {
     const id = () => `id-${++seq}`
     const rows: ExportRows = { categories: [], debts: [], cycles: [], income: [], fixed: [], variable: [] }
     data.categories.forEach((c, i) =>
-      rows.categories.push({ ...c, keywords: c.keywords ?? [], id: id(), user_id: userId, sort_order: i + 1, created_at: '' }),
+      rows.categories.push({ ...c, keywords: c.keywords ?? [], is_cuttable: false, id: id(), user_id: userId, sort_order: i + 1, created_at: '' }),
     )
     data.debts.forEach((d) =>
       rows.debts.push({
@@ -149,7 +149,7 @@ describe('kategori anahtar kelimeleri', () => {
   })
 
   it('dışa aktarmada yalnız doluysa yazılır', () => {
-    const row = (keywords: string[]) => ({ ...spor, type: 'kisilabilir' as const, id: 'c', user_id: 'u', sort_order: 1, created_at: '', keywords })
+    const row = (keywords: string[]) => ({ ...spor, type: 'kisilabilir' as const, id: 'c', user_id: 'u', sort_order: 1, created_at: '', keywords, is_cuttable: false })
     const rows = (keywords: string[]): ExportRows => ({ categories: [row(keywords)], debts: [], cycles: [], income: [], fixed: [], variable: [] })
     expect(buildExport(rows(['fitness']), 'x').categories).toEqual([{ ...spor, keywords: ['fitness'] }])
     expect(buildExport(rows([]), 'x').categories).toEqual([spor])

@@ -13,6 +13,25 @@ import { DEFAULT_CATEGORIES } from '../../supabase/functions/_shared/categories'
 import { contrastRatio, fromOklch, toOklch } from './categoryColors'
 import { foldTurkish } from './fallbackParser'
 
+/**
+ * Kullanıcının kısılabilir seçtiği kategori key'leri (kategori sırasıyla).
+ * is_cuttable alanı hiç gelmemişse (migration öncesi / eski önbellek) varsayılan
+ * kısılabilir kategoriler kullanılır — davranış değişmesin.
+ */
+export function cuttableKeys(categories: readonly { key: string; is_cuttable?: boolean | null }[]): string[] {
+  if (categories.length && categories.every((c) => c.is_cuttable === undefined || c.is_cuttable === null)) {
+    const own = new Set(categories.map((c) => c.key))
+    return DEFAULT_CATEGORIES.filter((d) => d.cuttable && own.has(d.key)).map((d) => d.key)
+  }
+  return categories.filter((c) => c.is_cuttable === true).map((c) => c.key)
+}
+
+/** Kısılabilir kategorilerin adları (kart alt başlıkları için), kategori sırasıyla. */
+export function cuttableLabels(categories: readonly { key: string; label: string; is_cuttable?: boolean | null }[]): string[] {
+  const keys = new Set(cuttableKeys(categories))
+  return categories.filter((c) => keys.has(c.key)).map((c) => c.label)
+}
+
 export const CATEGORY_TYPE_LABELS: Readonly<Record<CategoryType, string>> = {
   zorunlu: 'Zorunlu',
   kisilabilir: 'Kısılabilir',

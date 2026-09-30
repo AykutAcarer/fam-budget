@@ -1,8 +1,10 @@
 /**
- * Kısılabilir dörtlü kıyas kartı: bu döngü (bugüne kadar) vs baz ay (aynı döngü
- * gününe kadar). Rakamlar compare.ts'ten gelir; burada hesap yapılmaz.
+ * Kısılabilir harcama kıyas kartı: bu döngü (bugüne kadar) vs baz ay (aynı döngü
+ * gününe kadar). Hangi kategorilerin dahil olduğunu kullanıcı Ayarlar'dan seçer.
+ * Rakamlar compare.ts'ten gelir; burada hesap yapılmaz.
  */
 import { Link } from 'react-router-dom'
+import { NoCuttable } from '../NoCuttable'
 import type { Comparison } from '../../lib/compare'
 import { formatEur, formatSignedEur } from '../../lib/format'
 import { Card, CardTitle } from '../ui'
@@ -13,6 +15,8 @@ interface Props {
   baselineLabel: string | null
   /** Aktif döngü baz ayın kendisi mi? */
   activeIsBaseline: boolean
+  /** Kısılabilir seçili kategorilerin adları (kategori sırasıyla). */
+  cuttableLabels: readonly string[]
 }
 
 function Bar({ label, value, max, className }: { label: string; value: number; max: number; className: string }) {
@@ -26,7 +30,17 @@ function Bar({ label, value, max, className }: { label: string; value: number; m
   )
 }
 
-export function ComparisonCard({ comparison, day, baselineLabel, activeIsBaseline }: Props) {
+export function ComparisonCard({ comparison, day, baselineLabel, activeIsBaseline, cuttableLabels }: Props) {
+  if (cuttableLabels.length === 0) {
+    return (
+      <Card>
+        <CardTitle>Kısılabilir harcamalar · baz aya göre</CardTitle>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          <NoCuttable />
+        </p>
+      </Card>
+    )
+  }
   if (!comparison) {
     return (
       <Card>
@@ -61,7 +75,9 @@ export function ComparisonCard({ comparison, day, baselineLabel, activeIsBaselin
   return (
     <Card>
       <CardTitle>Kısılabilir harcamalar · baz aya göre</CardTitle>
-      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Kahvaltı + İş + Halı saha + Sosyal, {day}. güne kadar</p>
+      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+        {cuttableLabels.join(' + ')}, {day}. güne kadar
+      </p>
 
       <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-xl bg-slate-50 py-2.5 dark:bg-slate-800/60">

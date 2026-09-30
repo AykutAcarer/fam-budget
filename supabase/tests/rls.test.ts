@@ -191,6 +191,7 @@ describe('baz ay', () => {
           active: { start: '2026-09-15', end: '2026-10-14', expenses: [] },
           baseline: { start: base[0].start_date, end: base[0].end_date, expenses: exp },
           today: '2026-09-17',
+          cuttableKeys: ['kahvalti', 'is', 'halisaha', 'sosyal'],
         })!
       }
 
