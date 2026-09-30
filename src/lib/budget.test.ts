@@ -25,9 +25,9 @@ function data(): BudgetData {
         { id: '2', user_id: 'u', cycle_id: 'a', date: '2026-09-30', source: 'Yardım', amount: 180.1, received: false, note: null, recurring: true, created_at: '' },
       ],
       fixed: [
-        { id: '3', user_id: 'u', cycle_id: 'a', date: '2026-09-15', item: 'Kira', amount: 850, paid: true, source: null, note: null, installments_left: null, recurring: true, created_at: '' },
-        { id: '4', user_id: 'u', cycle_id: 'a', date: '2026-09-20', item: 'Elektrik', amount: 72.5, paid: true, source: null, note: null, installments_left: null, recurring: true, created_at: '' },
-        { id: '5', user_id: 'u', cycle_id: 'a', date: '2026-10-01', item: 'İnternet', amount: 34.99, paid: false, source: null, note: null, installments_left: null, recurring: true, created_at: '' },
+        { id: '3', user_id: 'u', cycle_id: 'a', date: '2026-09-15', item: 'Kira', amount: 850, paid: true, source: null, note: null, installments_left: null, recurring: true, fixed_kind: 'duzenli', created_at: '' },
+        { id: '4', user_id: 'u', cycle_id: 'a', date: '2026-09-20', item: 'Elektrik', amount: 72.5, paid: true, source: null, note: null, installments_left: null, recurring: true, fixed_kind: 'duzenli', created_at: '' },
+        { id: '5', user_id: 'u', cycle_id: 'a', date: '2026-10-01', item: 'İnternet', amount: 34.99, paid: false, source: null, note: null, installments_left: null, recurring: true, fixed_kind: 'duzenli', created_at: '' },
       ],
       variable: [v('2026-09-15', 'mutfak', 30.1), v('2026-09-16', 'mutfak', 0.2), v('2026-09-16', 'sosyal', 9.7), v('2026-09-20', 'kredi karti', 150)],
     },

@@ -71,8 +71,12 @@ export type FixedExpenseRow = {
   installments_left: number | null
   /** Her döngüde tekrar eder mi (devirde taşınır)? */
   recurring: boolean
+  /** 'duzenli': her ay düzenli (installments_left NULL); 'taksit': kalan taksit dolu. */
+  fixed_kind: FixedKind
   created_at: string
 }
+
+export type FixedKind = 'duzenli' | 'taksit'
 
 export type VariableExpenseRow = {
   id: string
@@ -139,7 +143,7 @@ export interface Database {
       fixed_expenses: Table<
         FixedExpenseRow,
         'cycle_id' | 'date' | 'item' | 'amount',
-        Generated | 'paid' | 'source' | 'note' | 'installments_left' | 'recurring'
+        Generated | 'paid' | 'source' | 'note' | 'installments_left' | 'recurring' | 'fixed_kind'
       >
       variable_expenses: Table<
         VariableExpenseRow,

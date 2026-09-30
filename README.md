@@ -11,7 +11,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
 
 - [x] **1. katman:** iskelet, Supabase auth (kayıt/giriş/çıkış), tablolar + RLS, boş dashboard, tema
 - [x] **2. katman:** JSON içe/dışa aktarma, kıyas motoru, sohbetle harcama girişi (Edge Function `chat-expense` + Claude + kural tabanlı yedek + çevrimdışı kuyruk), gerçek veriye bağlı dashboard (kıyas kartı, KPI'lar, kategori donut'u)
-- [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil, taksit ve kart bilgisi
+- [x] **Sabit giderler / ödeme takvimi:** ödendi işaretleme, yaklaşan/geciken şeridi, ekle/düzenle/sil; "Her Ay Düzenli Ödenenler" ve "Taksitler" ayrı bölümler (kendi toplamlarıyla), taksitte kalan sayı ve tahmini bitiş
 - [x] **Gelir girişi:** Sabit sekmesinde "Gelir" bölümü — toplam / alınan / beklenen, alındı anahtarı, ekle/düzenle/sil, tek seferlik işareti
 - [x] **Döngü devri:** her ayın 15'inde yeni döngü tekrar eden gelir ve sabit giderlerle otomatik başlar; taksitler bir azalır
 - [x] **Borçlar:** toplam / faizli / faizsiz özet, faizliler önce sıralama, "önce bunu öde", vade uyarısı, ekle/düzenle/sil
@@ -42,6 +42,7 @@ Spec: [`codex_prompt.md`](codex_prompt.md) · Sohbet AI system mesajı: [`app_sy
      | `20261004000000_debt_payments.sql` | Borç ödeme geçmişi tablosu `debt_payments` (RLS) + bakiyeyi aynı işlemde güncelleyen tetikleyici |
      | `20261005000000_chat_messages.sql` | Sohbet geçmişi tablosu `chat_messages` (RLS) — cihazlar arası sohbet |
      | `20261006000000_cuttable_categories.sql` | Kategorilere `is_cuttable` (kısılabilir mi — kullanıcı seçer); mevcut kullanıcılarda kahvaltı, iş, halı saha, sosyal işaretlenir |
+     | `20261007000000_fixed_kind.sql` | Sabit giderlere `fixed_kind` (`duzenli` / `taksit`; kalan taksiti olanlar taksit olarak işaretlenir), devir ve içe aktarma tipe göre |
 
    - **CLI:** `npx supabase init` (mevcut `supabase/` dosyaları korunur) → `npx supabase link --project-ref <ref>` → `npx supabase db push`
 3. *Authentication > Providers > Email* açık olsun. E-posta doğrulaması açıksa kayıttan sonra gelen bağlantıya tıklamak gerekir
@@ -221,7 +222,7 @@ metin ──► chat-expense (parse) ──► kategori belirsiz mi? ──► k
 |---|---|
 | `categories` | Kullanıcının kategorileri (`key`, `label`, `type`, `color`, `keywords`). Yeni kullanıcıya 10 varsayılan kategori trigger ile eklenir (bkz. *Kategori renkleri*, *Kategori yönetimi*). |
 | `cycles` | Maaş gününe (15'i) bağlı döngüler. `key` (ör. `2026-09`) içe aktarmada idempotent upsert için kullanılır. Kullanıcı başına en fazla bir `is_baseline`. |
-| `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.installments_left`: kalan taksit (taksit değilse NULL). |
+| `income`, `fixed_expenses`, `variable_expenses` | Döngüye bağlı kayıtlar; döngü silinince silinir. `fixed_expenses.fixed_kind`: `duzenli` (her ay) ya da `taksit`; `installments_left`: kalan taksit — yalnız taksitte dolu (tutarlılık check'i). |
 | `debts` | Borçlar. `due_date` `YYYY-MM` veya `YYYY-MM-DD`. |
 | `chat_messages` | Sohbet mesajları (`role` `user`/`assistant`, `content`, `meta` — kaydedilen kalemler, geri alındı, cevabı kim yazdı; `related_expense_id`). `id` ve `created_at` istemciden gelir: çevrimdışı kuyruktan upsert kopya üretmez, geç gönderilen mesaj kendi zamanında sıralanır. |
 | `debt_payments` | Borç ödemeleri (`debt_id`, `date`, `amount`, `note`). Borca `(debt_id, user_id)` bileşik FK ile bağlı; borç silinince silinir. Ekle / sil / tutar düzenle, tetikleyiciyle borcun `balance`'ını aynı işlemde günceller; kalan bakiyeden büyük ödeme reddedilir. |
@@ -296,8 +297,17 @@ giderler**. Gelir toplamları [`src/lib/income.ts`](src/lib/income.ts)'ten gelir
 fonksiyonu kullanır. Gelir ve sabit gider kalemleri "Her ay tekrar eder" (`recurring`) işaretini taşır; kaldırılırsa kalem
 "tek seferlik" rozetiyle gösterilir ve döngü devrinde taşınmaz. Kalan taksit sayısı bu döngününkini de içerir (1 = son taksit).
 
-Sabit gider listesi aktif döngünün sabit giderlerini ödeme gününe göre gösterir. Toplamlar (toplam / ödenen / kalan) ve
-durumlar [`src/lib/fixed.ts`](src/lib/fixed.ts)'ten gelir; dashboard'daki sabit gider KPI'ı da aynı fonksiyonu kullanır.
+Sabit giderler iki bölümde, ödeme gününe göre listelenir:
+
+- **Her Ay Düzenli Ödenenler** (`fixed_kind = 'duzenli'`: kira, internet, telefon, elektrik, abonelikler…) — başlıkta aylık
+  düzenli toplam.
+- **Taksitler** (`fixed_kind = 'taksit'`) — kalan taksit sayısı, "son taksit" etiketi (kalan 1) ve tahmini bitiş
+  (bu döngüdeki ödeme tarihi + kalan − 1 ay); başlıkta aylık taksit yükü.
+
+Ekle / düzenle formunda tip seçilir: Taksit'te "kalan taksit" alanı görünür ve zorunludur (1–999), Düzenli'de gizlidir ve
+kalan taksit boş kaydedilir. Toplamlar (toplam / ödenen / kalan, grup toplamları), gruplama ve durumlar
+[`src/lib/fixed.ts`](src/lib/fixed.ts)'ten gelir; dashboard'daki sabit gider KPI'ı da aynı fonksiyonu kullanır.
+Tip alanını göndermeyen eski istemciler için veritabanında tip, kalan taksitten türetilir (tetikleyici).
 
 | Durum | Kural (ödenmemişse) |
 |---|---|
@@ -338,7 +348,7 @@ Her ayın 15'inde uygulama JSON içe aktarmaya gerek kalmadan yeni döngüye ge�
   döngüler sırayla üretilir (taksitler her döngüde bir azalır). Çevrimdışıyken beklenmez; ilk bağlantıda yapılır.
 - **Ne taşınır** (`roll_forward_cycle`, tek işlem): yalnızca "Her ay tekrar eder" işaretli gelir ve sabit giderler —
   "alınmadı / ödenmedi" olarak; kalem, tutar, kaynak (kart vb.) ve ayın günü korunur (ayda o gün yoksa ay sonu: 31 → 30 Kas).
-  Kalan taksit bir azalır; 1 ise (son taksit önceki döngüdeydi) kalem taşınmaz. Notlar (o aya özgü) ve değişken harcamalar
+  Tipe göre: `duzenli` aynen kopyalanır; `taksit`in kalanı bir azalır, 1 ise (son taksit önceki döngüdeydi) kalem taşınmaz. Notlar (o aya özgü) ve değişken harcamalar
   taşınmaz. Baz ay değişmez.
 - **İdempotent:** yeni döngünün başlangıç tarihini kapsayan döngü zaten varsa (önceden devredilmiş ya da içe aktarılmış)
   hiçbir şey kopyalanmaz.

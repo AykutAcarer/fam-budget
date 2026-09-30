@@ -1,12 +1,21 @@
 /**
  * Sabit gider ekle / düzenle (tarih dahil — faturayı ileri güne "esnetmek" için).
+ * Tip: Düzenli (her ay) ya da Taksit (kalan taksit sayısı zorunlu, görünür).
  * Doğrulama src/lib/fixed.ts'te (validateFixedForm).
  */
 import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { FixedExpenseRow } from '../../lib/database.types'
-import { dateForDayInCycle, isCardSource, nextSource, validateFixedForm, type FixedFormInput } from '../../lib/fixed'
+import type { FixedExpenseRow, FixedKind } from '../../lib/database.types'
+import {
+  dateForDayInCycle,
+  fixedKindOf,
+  installmentEndDate,
+  isCardSource,
+  nextSource,
+  validateFixedForm,
+  type FixedFormInput,
+} from '../../lib/fixed'
 import type { FixedInput } from '../../lib/fixedApi'
 import { formatAmountInput } from '../../lib/format'
 import { inputClass } from '../ui'
@@ -24,12 +33,13 @@ const errorText = (e: unknown) =>
   e instanceof Error ? e.message : typeof e === 'object' && e && 'message' in e ? String(e.message) : String(e)
 
 function initialInput(row: FixedExpenseRow | null): FixedFormInput {
-  if (!row) return { day: '', item: '', amount: '', card: false, installmentsLeft: '', recurring: true }
+  if (!row) return { day: '', item: '', amount: '', card: false, kind: 'duzenli', installmentsLeft: '', recurring: true }
   return {
     day: String(Number(row.date.slice(8, 10))),
     item: row.item,
     amount: formatAmountInput(row.amount),
     card: isCardSource(row.source),
+    kind: fixedKindOf(row),
     installmentsLeft: row.installments_left === null ? '' : String(row.installments_left),
     recurring: row.recurring,
   }
@@ -55,6 +65,12 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
 
   const dayNum = Number(input.day)
   const resolved = /^\d{1,2}$/.test(input.day) ? dateForDayInCycle(cycle.start, cycle.end, dayNum) : null
+  const left = /^\d+$/.test(input.installmentsLeft) ? Number(input.installmentsLeft) : null
+  const endDate = input.kind === 'taksit' && resolved ? installmentEndDate(resolved, left) : null
+  const KINDS: [FixedKind, string][] = [
+    ['duzenli', 'Her ay düzenli'],
+    ['taksit', 'Taksit'],
+  ]
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -73,6 +89,7 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
         source: nextSource(existing?.source ?? null, input.card),
         installments_left: result.value.installmentsLeft,
         recurring: result.value.recurring,
+        fixed_kind: result.value.kind,
       })
       onClose()
     } catch (err) {
@@ -153,9 +170,29 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
         {fieldError('day')}
         {fieldError('item')}
 
-        <div className="grid grid-cols-2 gap-3">
+        <fieldset>
+          <legend className="text-sm font-medium">Tip</legend>
+          <div role="radiogroup" aria-label="Tip" className="mt-1 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            {KINDS.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={input.kind === value}
+                onClick={() => set('kind', value)}
+                className={`min-h-10 rounded-lg text-sm font-semibold transition-colors ${
+                  input.kind === value ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <div className={`grid gap-3 ${input.kind === 'taksit' ? 'grid-cols-2' : 'grid-cols-1'}`}>
           <label className="block text-sm font-medium">
-            Tutar (€)
+            {input.kind === 'taksit' ? 'Aylık taksit (€)' : 'Aylık tutar (€)'}
             <input
               type="text"
               inputMode="decimal"
@@ -168,6 +205,7 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
             />
             {fieldError('amount')}
           </label>
+          {input.kind === 'taksit' && (
           <label className="block text-sm font-medium">
             Kalan taksit <span className="font-normal text-slate-500 dark:text-slate-400">(bu ay dahil · 1 = son)</span>
             <input
@@ -178,11 +216,17 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
               aria-invalid={!!errors.installmentsLeft}
               aria-describedby={errors.installmentsLeft ? 'fixed-installmentsLeft-error' : undefined}
               className={inputClass}
-              placeholder="yok"
+              placeholder="ör. 6"
             />
             {fieldError('installmentsLeft')}
           </label>
+          )}
         </div>
+        {endDate && (
+          <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
+            {left === 1 ? 'Bu ayki son taksit.' : `Tahmini son taksit: ${dayjs(endDate).locale('tr').format('MMMM YYYY')}`}
+          </p>
+        )}
 
         <label className="flex min-h-11 items-center gap-3 text-sm font-medium">
           <input
@@ -202,7 +246,9 @@ export function FixedForm({ existing, cycle, onClose, onSave, onDelete }: Props)
           />
           <span>
             Her ay tekrar eder
-            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">Yeni döngüye otomatik taşınır; taksitte sayı bir azalır.</span>
+            <span className="block text-xs font-normal text-slate-500 dark:text-slate-400">
+              Yeni döngüye otomatik taşınır; taksitte sayı bir azalır, son taksitten sonra düşer.
+            </span>
           </span>
         </label>
 

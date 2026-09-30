@@ -3,8 +3,11 @@ import {
   alertItems,
   dateForDayInCycle,
   daysUntil,
+  fixedKindOf,
   fixedStatus,
   fixedTotals,
+  groupFixed,
+  installmentEndDate,
   isCardSource,
   nextSource,
   sortFixed,
@@ -98,22 +101,37 @@ describe('dateForDayInCycle', () => {
 
 describe('validateFixedForm', () => {
   const cycle = { start: '2026-09-15', end: '2026-10-14' }
-  const base = { day: '7', item: ' Telekom ', amount: '39,99', card: true, installmentsLeft: '', recurring: true }
+  const base = { day: '7', item: ' Telekom ', amount: '39,99', card: true, kind: 'duzenli' as const, installmentsLeft: '', recurring: true }
 
   it('geçerli form → döngü içi tarih ve sayı', () => {
     expect(validateFixedForm(base, cycle)).toEqual({
       ok: true,
-      value: { date: '2026-10-07', item: 'Telekom', amount: 39.99, installmentsLeft: null, recurring: true },
+      value: { date: '2026-10-07', item: 'Telekom', amount: 39.99, kind: 'duzenli', installmentsLeft: null, recurring: true },
     })
   })
 
   it('taksit ve binlik ayırıcılı tutar', () => {
-    const r = validateFixedForm({ ...base, amount: '1.250,50', installmentsLeft: '6' }, cycle)
-    expect(r).toMatchObject({ ok: true, value: { amount: 1250.5, installmentsLeft: 6 } })
+    const r = validateFixedForm({ ...base, kind: 'taksit', amount: '1.250,50', installmentsLeft: '6' }, cycle)
+    expect(r).toMatchObject({ ok: true, value: { kind: 'taksit', amount: 1250.5, installmentsLeft: 6 } })
+  })
+
+  it('taksitte kalan sayı zorunlu ve 1..999', () => {
+    const empty = validateFixedForm({ ...base, kind: 'taksit', installmentsLeft: '' }, cycle)
+    expect(!empty.ok && empty.errors.installmentsLeft).toMatch(/kalan taksit sayısını/)
+    expect(validateFixedForm({ ...base, kind: 'taksit', installmentsLeft: '0' }, cycle).ok).toBe(false)
+    expect(validateFixedForm({ ...base, kind: 'taksit', installmentsLeft: '1000' }, cycle).ok).toBe(false)
+    expect(validateFixedForm({ ...base, kind: 'taksit', installmentsLeft: '1' }, cycle)).toMatchObject({ ok: true, value: { installmentsLeft: 1 } })
+  })
+
+  it('düzenlide kalan taksit alanı yok sayılır (null kaydedilir)', () => {
+    expect(validateFixedForm({ ...base, kind: 'duzenli', installmentsLeft: '6' }, cycle)).toMatchObject({
+      ok: true,
+      value: { kind: 'duzenli', installmentsLeft: null },
+    })
   })
 
   it('hatalar alan bazında', () => {
-    const r = validateFixedForm({ day: '40', item: '  ', amount: 'on', card: false, installmentsLeft: '-1', recurring: true }, cycle)
+    const r = validateFixedForm({ day: '40', item: '  ', amount: 'on', card: false, kind: 'taksit', installmentsLeft: '-1', recurring: true }, cycle)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(Object.keys(r.errors).sort()).toEqual(['amount', 'day', 'installmentsLeft', 'item'])
   })
@@ -138,5 +156,54 @@ describe('kart kaynağı', () => {
     expect(nextSource('Kredi kartı', false)).toBeNull()
     expect(nextSource('Maaş hesabı', false)).toBe('Maaş hesabı')
     expect(nextSource('Maaş hesabı', true)).toBe('kart')
+  })
+})
+
+describe('Düzenli / Taksit ayrımı', () => {
+  const row = (item: string, date: string, amount: number, installments_left: number | null, paid = false, fixed_kind?: 'duzenli' | 'taksit') => ({
+    item, date, amount, paid, installments_left, ...(fixed_kind ? { fixed_kind } : {}),
+  })
+  const items = [
+    row('Radar', '2026-09-20', 25, 5, false, 'taksit'),
+    row('Kira', '2026-09-15', 850, null, true, 'duzenli'),
+    row('PS5', '2026-09-25', 45.5, 1, true, 'taksit'),
+    row('İnternet', '2026-10-03', 39.99, null, false, 'duzenli'),
+    row('Telefon', '2026-09-28', 0.1, null, false, 'duzenli'),
+    row('Notebook', '2026-10-01', 0.2, 12, false, 'taksit'),
+  ]
+
+  it('iki grup doğru ayrılır, ödeme gününe göre sıralı', () => {
+    const g = groupFixed(items)
+    expect(g.duzenli.map((i) => i.item)).toEqual(['Kira', 'Telefon', 'İnternet'])
+    expect(g.taksit.map((i) => i.item)).toEqual(['Radar', 'PS5', 'Notebook'])
+  })
+
+  it('grup toplamları sent hassasiyetinde; ödenen/ödenmeyen fark etmez', () => {
+    const g = groupFixed(items)
+    expect(g.duzenliTotal).toBe(890.09) // 850 + 0,10 + 39,99
+    expect(g.taksitTotal).toBe(70.7) // 25 + 45,50 + 0,20
+    // İki grup birlikte genel toplamı verir
+    expect(g.duzenliTotal + g.taksitTotal).toBeCloseTo(fixedTotals(items).total, 10)
+  })
+
+  it('boş liste', () => {
+    expect(groupFixed([])).toEqual({ duzenli: [], taksit: [], duzenliTotal: 0, taksitTotal: 0 })
+  })
+
+  it('tip alanı yoksa (migration öncesi veri) kalan taksitten türetilir', () => {
+    expect(fixedKindOf({ installments_left: 3 })).toBe('taksit')
+    expect(fixedKindOf({ installments_left: null })).toBe('duzenli')
+    expect(fixedKindOf({ installments_left: null, fixed_kind: 'taksit' })).toBe('taksit')
+    const g = groupFixed([row('Eski taksit', '2026-09-20', 10, 2), row('Eski kira', '2026-09-15', 100, null)])
+    expect(g.taksit.map((i) => i.item)).toEqual(['Eski taksit'])
+    expect(g.duzenli.map((i) => i.item)).toEqual(['Eski kira'])
+  })
+
+  it('tahmini son taksit: bu ayki ödeme + (kalan − 1) ay', () => {
+    expect(installmentEndDate('2026-09-20', 5)).toBe('2027-01-20')
+    expect(installmentEndDate('2026-09-20', 1)).toBe('2026-09-20') // bu ay son
+    expect(installmentEndDate('2026-10-31', 2)).toBe('2026-11-30') // ay sonu
+    expect(installmentEndDate('2026-09-20', null)).toBeNull()
+    expect(installmentEndDate('2026-09-20', 0)).toBeNull()
   })
 })

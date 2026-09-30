@@ -4,7 +4,7 @@
  */
 import type { CycleWindow } from './cycle'
 import { cycleLabel, cycleWindowFor } from './cycle'
-import type { CycleRow, FixedExpenseRow, IncomeRow } from './database.types'
+import type { CycleRow, FixedExpenseRow, FixedKind, IncomeRow } from './database.types'
 import { ensureCycleFor } from './expensesApi'
 import { cachedLoad } from './offlineCache'
 import { supabase } from './supabase'
@@ -57,6 +57,7 @@ export interface FixedInput {
   source: string | null
   installments_left: number | null
   recurring: boolean
+  fixed_kind: FixedKind
 }
 
 export async function createFixed(input: FixedInput): Promise<FixedExpenseRow> {
@@ -72,7 +73,7 @@ export async function createFixed(input: FixedInput): Promise<FixedExpenseRow> {
 
 export async function updateFixed(
   id: string,
-  patch: Partial<Pick<FixedExpenseRow, 'date' | 'item' | 'amount' | 'source' | 'installments_left' | 'paid' | 'recurring'>>,
+  patch: Partial<Pick<FixedExpenseRow, 'date' | 'item' | 'amount' | 'source' | 'installments_left' | 'paid' | 'recurring' | 'fixed_kind'>>,
 ): Promise<FixedExpenseRow> {
   const { data, error } = await supabase.from('fixed_expenses').update(patch).eq('id', id).select('*').single()
   if (error) throw error

@@ -2,8 +2,10 @@
  * Sabit giderler / ödeme takvimi — saf fonksiyonlar (yan etkisiz, testli).
  * Para toplamları sent cinsinden tam sayıyla yapılır; UI yalnızca gösterir.
  */
+import dayjs from 'dayjs'
 import { cycleDay } from './cycle'
 import { clampIsoDate } from './date'
+import type { FixedKind } from './database.types'
 import { foldTurkish, parseTurkishAmount } from './fallbackParser'
 import { fromCents, toCents } from './money'
 
@@ -66,6 +68,52 @@ export function fixedTotals(items: readonly Pick<FixedLike, 'amount' | 'paid'>[]
   return { total: fromCents(paid + remaining), paid: fromCents(paid), remaining: fromCents(remaining) }
 }
 
+// ---------------------------------------------------------------------------
+// Düzenli / Taksit
+// ---------------------------------------------------------------------------
+
+export interface KindLike extends FixedLike {
+  fixed_kind?: FixedKind | null
+  installments_left: number | null
+}
+
+/**
+ * Kalemin tipi. Alan yoksa (migration öncesi / eski önbellek) kalan taksitten
+ * türetilir — veritabanındaki backfill ile aynı kural.
+ */
+export function fixedKindOf(row: Pick<KindLike, 'fixed_kind' | 'installments_left'>): FixedKind {
+  return row.fixed_kind ?? (row.installments_left !== null ? 'taksit' : 'duzenli')
+}
+
+export interface FixedGroups<T> {
+  /** Her ay düzenli ödenenler, ödeme gününe göre. */
+  duzenli: T[]
+  /** Taksitler, ödeme gününe göre. */
+  taksit: T[]
+  /** Grup toplamları (aylık yük) — sent hassasiyetinde. */
+  duzenliTotal: number
+  taksitTotal: number
+}
+
+/** Sabitler sayfasının iki bölümü ve her birinin aylık toplamı. */
+export function groupFixed<T extends KindLike>(items: readonly T[]): FixedGroups<T> {
+  const sorted = sortFixed(items)
+  const duzenli = sorted.filter((i) => fixedKindOf(i) === 'duzenli')
+  const taksit = sorted.filter((i) => fixedKindOf(i) === 'taksit')
+  const sum = (list: readonly T[]) => fromCents(list.reduce((s, i) => s + toCents(i.amount), 0))
+  return { duzenli, taksit, duzenliTotal: sum(duzenli), taksitTotal: sum(taksit) }
+}
+
+/**
+ * Tahmini son taksit tarihi: bu döngüdeki ödeme tarihi + (kalan − 1) ay
+ * (ayda o gün yoksa ay sonu). Kalan 1 ise bu döngüdeki ödeme sonuncudur.
+ * Kalan yoksa ya da 0 ise null.
+ */
+export function installmentEndDate(date: string, installmentsLeft: number | null): string | null {
+  if (installmentsLeft === null || installmentsLeft < 1) return null
+  return dayjs(date).add(installmentsLeft - 1, 'month').format('YYYY-MM-DD')
+}
+
 /** Uyarı şeridi: gecikmiş (en eski önce), sonra bugün ve yaklaşan (tarihe göre). */
 export function alertItems<T extends FixedLike>(items: readonly T[], today: string): T[] {
   const rank: Partial<Record<FixedStatus, number>> = { gecikmis: 0, bugun: 1, yaklasan: 1 }
@@ -107,6 +155,8 @@ export interface FixedFormInput {
   item: string
   amount: string
   card: boolean
+  /** Düzenli (her ay) ya da Taksit (kalan sayı zorunlu). */
+  kind: FixedKind
   installmentsLeft: string
   /** Her döngüde tekrar eder mi (devirde taşınır)? */
   recurring: boolean
@@ -116,6 +166,8 @@ export interface FixedFormValue {
   date: string
   item: string
   amount: number
+  kind: FixedKind
+  /** Taksitte 1..999; düzenlide null. */
   installmentsLeft: number | null
   recurring: boolean
 }
@@ -139,15 +191,18 @@ export function validateFixedForm(input: FixedFormInput, cycle: { start: string;
   const amount = /^\s*\d[\d.,]*\s*$/.test(input.amount) ? parseTurkishAmount(input.amount.trim()) : null
   if (amount === null) errors.amount = 'Geçerli bir tutar gir (ör. 49,99).'
 
+  // Taksitte kalan sayı zorunlu (1 = son taksit); düzenlide alan yok sayılır.
   let installmentsLeft: number | null = null
-  if (input.installmentsLeft.trim()) {
-    const n = Number(input.installmentsLeft)
-    if (!Number.isInteger(n) || n < 0 || n > 999) errors.installmentsLeft = 'Kalan taksit 0 veya pozitif bir tam sayı olmalı.'
+  if (input.kind === 'taksit') {
+    const raw = input.installmentsLeft.trim()
+    const n = Number(raw)
+    if (!raw) errors.installmentsLeft = 'Taksitte kalan taksit sayısını yaz (bu ay dahil).'
+    else if (!/^\d+$/.test(raw) || n < 1 || n > 999) errors.installmentsLeft = 'Kalan taksit 1–999 arasında bir tam sayı olmalı.'
     else installmentsLeft = n
   }
 
   if (Object.keys(errors).length) return { ok: false, errors }
-  return { ok: true, value: { date: date!, item, amount: amount!, installmentsLeft, recurring: input.recurring } }
+  return { ok: true, value: { date: date!, item, amount: amount!, kind: input.kind, installmentsLeft, recurring: input.recurring } }
 }
 
 /**

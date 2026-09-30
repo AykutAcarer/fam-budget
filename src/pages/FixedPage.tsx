@@ -1,12 +1,13 @@
 /**
  * Gelir + Sabit Giderler / Ödeme Takvimi (codex_prompt.md §6C). Gelir bölümü üstte.
- * Aktif döngünün sabit giderleri: özet, yaklaşan/gecikmiş şeridi, ödeme
- * günü sıralı liste, ödendi işaretleme, ekle/düzenle/sil. Tüm toplamlar ve
- * durumlar src/lib/fixed.ts'ten; bu ekran yalnızca gösterir.
+ * Aktif döngünün sabit giderleri: özet, yaklaşan/gecikmiş şeridi, iki bölüm
+ * ("Her Ay Düzenli Ödenenler" ve "Taksitler", her biri kendi toplamıyla),
+ * ödendi işaretleme, ekle/düzenle/sil. Tüm toplamlar, gruplama ve durumlar
+ * src/lib/fixed.ts'ten; bu ekran yalnızca gösterir.
  */
 import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { FixedForm } from '../components/fixed/FixedForm'
 import { IncomeForm } from '../components/fixed/IncomeForm'
 import { IncomeSection } from '../components/fixed/IncomeSection'
@@ -17,7 +18,7 @@ import { CardIcon, CheckIcon, PlusIcon } from '../components/icons'
 import { Card, CardTitle, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
 import type { FixedExpenseRow, IncomeRow } from '../lib/database.types'
-import { alertItems, daysUntil, fixedStatus, fixedTotals, isCardSource, sortFixed } from '../lib/fixed'
+import { alertItems, daysUntil, fixedStatus, fixedTotals, groupFixed, installmentEndDate, isCardSource, sortFixed } from '../lib/fixed'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 import { useReadOnly } from '../lib/useOnline'
@@ -44,6 +45,42 @@ function ExtraBadges({ row }: { row: FixedExpenseRow }) {
   )
 }
 
+/** Bir bölüm: başlık + aylık toplam + satırlar. */
+function FixedGroupCard({
+  title,
+  totalLabel,
+  total,
+  rows,
+  empty,
+  renderRow,
+}: {
+  title: string
+  totalLabel: string
+  total: number
+  rows: readonly FixedExpenseRow[]
+  empty: string
+  renderRow: (row: FixedExpenseRow) => ReactNode
+}) {
+  return (
+    <Card className="px-0 py-2">
+      <div className="flex items-baseline justify-between gap-3 px-4 pt-2 pb-1">
+        <h3 className="text-base font-bold tracking-tight">
+          {title} <span className="text-sm font-medium text-slate-500 dark:text-slate-400">({rows.length})</span>
+        </h3>
+        <p className="text-right">
+          <span className="block text-[11px] text-slate-500 dark:text-slate-400">{totalLabel}</span>
+          <span className="font-semibold tabular-nums">{formatEur(total)}</span>
+        </p>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{empty}</p>
+      ) : (
+        <ul>{rows.map(renderRow)}</ul>
+      )}
+    </Card>
+  )
+}
+
 export function FixedPage() {
   // Çevrimdışı: son görülen veri, salt okunur (fieldset tüm düğme ve alanları kapatır).
   const readOnly = useReadOnly()
@@ -55,6 +92,7 @@ export function FixedPage() {
   const items = useMemo(() => (data ? sortFixed(data.items) : []), [data])
   const totals = useMemo(() => fixedTotals(items), [items])
   const alerts = useMemo(() => alertItems(items, today), [items, today])
+  const groups = useMemo(() => groupFixed(items), [items])
 
   if (!data && !loadError) return <Spinner />
   if (!data)
@@ -68,6 +106,52 @@ export function FixedPage() {
         </Card>
       </>
     )
+
+  const renderRow = (row: FixedExpenseRow) => {
+    const status = fixedStatus(row, today)
+    const d = dayjs(row.date).locale('tr')
+    const end = installmentEndDate(row.date, row.installments_left)
+    return (
+      <li key={row.id} className="flex items-center gap-2 border-t border-slate-100 px-2 first:border-t-0 dark:border-slate-800">
+        <button
+          type="button"
+          onClick={() => setEditing({ row })}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
+          aria-label={`${row.item}, ${d.format('D MMMM')}, ${formatEur(row.amount)} — düzenle`}
+        >
+          <span
+            className={`flex w-11 shrink-0 flex-col items-center rounded-lg py-1 ${
+              row.paid ? 'bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500' : 'bg-slate-100 dark:bg-slate-800'
+            }`}
+          >
+            <span className="text-lg leading-tight font-bold tabular-nums">{d.format('D')}</span>
+            <span className="text-[10px] font-medium uppercase">{d.format('MMM')}</span>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate font-medium ${row.paid ? 'text-slate-500 dark:text-slate-400' : ''}`}>{row.item}</span>
+            <span className="mt-1 flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={status} days={daysUntil(row.date, today)} />
+              <ExtraBadges row={row} />
+            </span>
+            {end && row.installments_left !== null && row.installments_left > 1 && (
+              <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                Tahmini bitiş: {dayjs(end).locale('tr').format('MMMM YYYY')}
+              </span>
+            )}
+          </span>
+          <span className={`shrink-0 font-semibold tabular-nums ${row.paid ? 'text-slate-500 dark:text-slate-400' : ''}`}>
+            {formatEur(row.amount)}
+          </span>
+        </button>
+        <PaidSwitch
+          checked={row.paid}
+          label={`${row.item}: ${row.paid ? 'ödendi' : 'ödenecek'}`}
+          pending={pendingIds.has(row.id)}
+          onToggle={() => void togglePaid(row)}
+        />
+      </li>
+    )
+  }
 
   const addButton = (
     <button
@@ -178,53 +262,23 @@ export function FixedPage() {
             )}
           </Card>
 
-          {/* Ödeme takvimi */}
-          <Card className="px-0 py-2">
-            <h2 className="px-4 pt-2 pb-1 text-sm font-semibold text-slate-500 dark:text-slate-400">Ödeme takvimi</h2>
-            <ul>
-              {items.map((row) => {
-                const status = fixedStatus(row, today)
-                const d = dayjs(row.date).locale('tr')
-                return (
-                  <li key={row.id} className="flex items-center gap-2 border-t border-slate-100 px-2 first:border-t-0 dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setEditing({ row })}
-                      className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                      aria-label={`${row.item}, ${d.format('D MMMM')}, ${formatEur(row.amount)} — düzenle`}
-                    >
-                      <span
-                        className={`flex w-11 shrink-0 flex-col items-center rounded-lg py-1 ${
-                          row.paid ? 'bg-slate-50 text-slate-400 dark:bg-slate-800/60 dark:text-slate-500' : 'bg-slate-100 dark:bg-slate-800'
-                        }`}
-                      >
-                        <span className="text-lg leading-tight font-bold tabular-nums">{d.format('D')}</span>
-                        <span className="text-[10px] font-medium uppercase">{d.format('MMM')}</span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate font-medium ${row.paid ? 'text-slate-500 dark:text-slate-400' : ''}`}>
-                          {row.item}
-                        </span>
-                        <span className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <StatusBadge status={status} days={daysUntil(row.date, today)} />
-                          <ExtraBadges row={row} />
-                        </span>
-                      </span>
-                      <span className={`shrink-0 font-semibold tabular-nums ${row.paid ? 'text-slate-500 dark:text-slate-400' : ''}`}>
-                        {formatEur(row.amount)}
-                      </span>
-                    </button>
-                    <PaidSwitch
-                      checked={row.paid}
-                      label={`${row.item}: ${row.paid ? 'ödendi' : 'ödenecek'}`}
-                      pending={pendingIds.has(row.id)}
-                      onToggle={() => void togglePaid(row)}
-                    />
-                  </li>
-                )
-              })}
-            </ul>
-          </Card>
+          {/* İki bölüm: her ay düzenli ödenenler ve taksitler (ayrı başlık + ayrı toplam) */}
+          <FixedGroupCard
+            title="Her Ay Düzenli Ödenenler"
+            totalLabel="Aylık düzenli"
+            total={groups.duzenliTotal}
+            rows={groups.duzenli}
+            empty="Düzenli ödeme yok."
+            renderRow={renderRow}
+          />
+          <FixedGroupCard
+            title="Taksitler"
+            totalLabel="Aylık taksit yükü"
+            total={groups.taksitTotal}
+            rows={groups.taksit}
+            empty="Taksit yok. 🎉"
+            renderRow={renderRow}
+          />
         </>
       )}
 
