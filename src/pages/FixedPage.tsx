@@ -18,7 +18,7 @@ import { CardIcon, CheckIcon, PlusIcon } from '../components/icons'
 import { Card, CardTitle, PageHeader, Spinner } from '../components/ui'
 import { todayIso } from '../lib/cycle'
 import type { FixedExpenseRow, IncomeRow } from '../lib/database.types'
-import { alertItems, daysUntil, fixedStatus, fixedTotals, groupFixed, installmentEndDate, isCardSource, sortFixed } from '../lib/fixed'
+import { alertItems, daysUntil, fixedStatus, fixedTotals, groupFixed, installmentBadgeText, installmentEndDate, isCardSource, sortFixed } from '../lib/fixed'
 import { loadErrorText } from '../lib/loadError'
 import { formatEur } from '../lib/format'
 import { useReadOnly } from '../lib/useOnline'
@@ -34,10 +34,10 @@ function ExtraBadges({ row }: { row: FixedExpenseRow }) {
           kart
         </span>
       )}
-      {row.installments_left !== null && (
+      {installmentBadgeText(row.installments_left, row.paid) && (
         <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">
-          {/* Kalan sayı bu döngününkini de içerir: 1 = son taksit. */}
-          {row.installments_left === 0 ? 'taksit bitti' : row.installments_left === 1 ? 'son taksit' : `${row.installments_left} taksit kaldı`}
+          {/* Saklanan kalan bu ayı da içerir; bu ay ödendiyse gösterilenden 1 düşülür (installmentsShown). */}
+          {installmentBadgeText(row.installments_left, row.paid)}
         </span>
       )}
       {!row.recurring && <OneOffBadge />}

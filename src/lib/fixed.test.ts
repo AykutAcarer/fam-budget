@@ -7,7 +7,9 @@ import {
   fixedStatus,
   fixedTotals,
   groupFixed,
+  installmentBadgeText,
   installmentEndDate,
+  installmentsShown,
   isCardSource,
   nextSource,
   sortFixed,
@@ -205,5 +207,35 @@ describe('Düzenli / Taksit ayrımı', () => {
     expect(installmentEndDate('2026-10-31', 2)).toBe('2026-11-30') // ay sonu
     expect(installmentEndDate('2026-09-20', null)).toBeNull()
     expect(installmentEndDate('2026-09-20', 0)).toBeNull()
+  })
+})
+
+describe('gösterilen kalan taksit (yalnız görüntü)', () => {
+  it('installments_left 6: bu ay ödendiyse 5, ödenmediyse 6', () => {
+    expect(installmentsShown(6, true)).toBe(5)
+    expect(installmentsShown(6, false)).toBe(6)
+    expect(installmentBadgeText(6, true)).toBe('5 taksit kaldı')
+    expect(installmentBadgeText(6, false)).toBe('6 taksit kaldı')
+  })
+
+  it('tahmini bitiş ödeme durumundan bağımsız (saklanan değere göre)', () => {
+    const end = installmentEndDate('2026-09-20', 6)
+    expect(end).toBe('2027-02-20')
+    // Gösterilen sayı değişse de bitiş hesabı saklanan değeri kullanır
+    expect(installmentsShown(6, true)).not.toBe(installmentsShown(6, false))
+    expect(installmentEndDate('2026-09-20', 6)).toBe(end)
+  })
+
+  it('son taksit etiketleri', () => {
+    expect(installmentBadgeText(1, false)).toBe('son taksit')
+    expect(installmentBadgeText(1, true)).toBe('son taksit ödendi 🎉')
+    expect(installmentBadgeText(2, true)).toBe('1 taksit kaldı')
+    expect(installmentBadgeText(0, false)).toBe('taksit bitti')
+    expect(installmentBadgeText(null, true)).toBeNull()
+    expect(installmentsShown(null, false)).toBeNull()
+  })
+
+  it('devirle tutarlı: bu ay 6 ödendi → 5; devirde 5 ödenmedi → 5', () => {
+    expect(installmentsShown(6, true)).toBe(installmentsShown(6 - 1, false))
   })
 })

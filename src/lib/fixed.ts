@@ -105,6 +105,27 @@ export function groupFixed<T extends KindLike>(items: readonly T[]): FixedGroups
 }
 
 /**
+ * Ekranda gösterilen kalan taksit. Saklanan `installments_left` BU DÖNGÜ DAHİL
+ * kalandır; bu ayki taksit ödendiyse o artık "kalan" değildir, 1 düşülür.
+ * Yalnız görüntü: saklanan değer ve tahmini bitiş değişmez. Devirde saklanan
+ * değer 1 azalır ve paid=false olur → gösterilen sayı aynı kalır (tutarlı).
+ */
+export function installmentsShown(installmentsLeft: number | null, paid: boolean): number | null {
+  if (installmentsLeft === null) return null
+  return Math.max(0, installmentsLeft - (paid ? 1 : 0))
+}
+
+/** Taksit rozeti: "5 taksit kaldı", "son taksit" (bu ay, ödenmedi), "son taksit ödendi 🎉". */
+export function installmentBadgeText(installmentsLeft: number | null, paid: boolean): string | null {
+  const shown = installmentsShown(installmentsLeft, paid)
+  if (shown === null || installmentsLeft === null) return null
+  if (installmentsLeft < 1) return 'taksit bitti'
+  if (shown === 0) return 'son taksit ödendi 🎉'
+  if (!paid && installmentsLeft === 1) return 'son taksit'
+  return `${shown} taksit kaldı`
+}
+
+/**
  * Tahmini son taksit tarihi: bu döngüdeki ödeme tarihi + (kalan − 1) ay
  * (ayda o gün yoksa ay sonu). Kalan 1 ise bu döngüdeki ödeme sonuncudur.
  * Kalan yoksa ya da 0 ise null.
