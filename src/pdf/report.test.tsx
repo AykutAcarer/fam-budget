@@ -1,12 +1,13 @@
 import { writeFileSync } from 'node:fs'
 import { renderToBuffer } from '@react-pdf/renderer'
+import { isValidElement, type ReactElement } from 'react'
 import { describe, expect, it } from 'vitest'
 import { buildComparison, cycleSummary, type BudgetData } from '../lib/budget'
 import { creditCardStatus } from '../lib/creditCard'
 import type { CategoryRow, CycleRow, DebtRow, FixedExpenseRow } from '../lib/database.types'
 import { debtTotals } from '../lib/debts'
 import { groupFixed, installmentBadgeText } from '../lib/fixed'
-import { buildReport, longCycleLabel, reportFileName, stripEmoji } from '../lib/report'
+import { buildReport, DEBTS_UNAVAILABLE_NOTE, longCycleLabel, reportFileName, stripEmoji } from '../lib/report'
 import { BudgetReportDocument } from './BudgetReportDocument'
 import { registerPdfFonts } from './fonts'
 
@@ -93,6 +94,7 @@ describe('rapor verisi yalnız uygulamanın seçicilerinden gelir (PDF hesap yap
     expect(r.debts.rows.map((x) => x.name)).toEqual(['Ev sahibi — yan gider farkı', 'Aile büyüğü (Şükrü amca)'])
     expect(r.debts.total).toBe(debtTotals(debts).total)
     expect(Object.keys(r.debts.rows[0]).sort()).toEqual(['balance', 'name', 'priority'])
+    expect(r.debts.available).toBe(true)
   })
 
   it('sabitler groupFixed; kalan taksit düzeltilmiş gösterimle (bu ay ödendiyse −1), emojisiz', () => {
@@ -147,4 +149,52 @@ describe('PDF üretimi', () => {
     const buf = await renderToBuffer(<BudgetReportDocument report={buildReport({ data: d, today: TODAY, debts: [] })} />)
     expect(buf.subarray(0, 5).toString('latin1')).toBe('%PDF-')
   }, 30_000)
+})
+
+/** Belge ağacındaki tüm metinleri toplar (kendi bileşenlerimiz hook kullanmaz, doğrudan çağrılabilir). */
+function texts(node: unknown): string {
+  if (node === null || node === undefined || typeof node === 'boolean') return ''
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(texts).join('')
+  if (isValidElement(node)) {
+    const { type, props } = node as ReactElement<{ children?: unknown }>
+    if (typeof type === 'function') return texts((type as (p: unknown) => unknown)(props))
+    return texts(props.children) + ' '
+  }
+  return ''
+}
+
+describe('borç verisi alınamadığında (çevrimdışı, önbellek yok)', () => {
+  it.each([null, undefined])('debts=%s: rapor yine üretilir, borç listesi boş ve "görüntülenemedi" notu var', async (missing) => {
+    const r = buildReport({ data: data(), today: TODAY, debts: missing, now: NOW })
+    expect(r.debts).toEqual({ available: false, rows: [], total: 0 })
+    // Raporun geri kalanı normal
+    expect(r.summary).toEqual(buildReport({ data: data(), today: TODAY, debts, now: NOW }).summary)
+    expect(r.creditCard?.remaining).toBe(5726.31)
+
+    const tree = texts(<BudgetReportDocument report={r} />)
+    expect(tree).toContain('Borçlar (öncelik sırasıyla)')
+    expect(tree).toContain(DEBTS_UNAVAILABLE_NOTE)
+    expect(DEBTS_UNAVAILABLE_NOTE).toMatch(/görüntülenemedi/)
+    expect(tree).not.toContain('Toplam borç')
+
+    registerPdfFonts()
+    const buf = await renderToBuffer(<BudgetReportDocument report={r} />)
+    expect(buf.subarray(0, 5).toString('latin1')).toBe('%PDF-')
+  }, 30_000)
+
+  it('borç verisi varken davranış aynı: liste + toplam, not yok', () => {
+    const tree = texts(<BudgetReportDocument report={buildReport({ data: data(), today: TODAY, debts, now: NOW })} />)
+    expect(tree).toContain('Ev sahibi — yan gider farkı')
+    expect(tree).toContain('Toplam borç')
+    expect(tree).not.toContain(DEBTS_UNAVAILABLE_NOTE)
+  })
+
+  it('boş borç listesi (kayıtlı borç yok) "görüntülenemedi" değildir', () => {
+    const r = buildReport({ data: data(), today: TODAY, debts: [], now: NOW })
+    expect(r.debts.available).toBe(true)
+    const tree = texts(<BudgetReportDocument report={r} />)
+    expect(tree).toContain('Kayıtlı borç yok.')
+    expect(tree).not.toContain(DEBTS_UNAVAILABLE_NOTE)
+  })
 })

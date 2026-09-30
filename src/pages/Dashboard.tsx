@@ -66,7 +66,8 @@ export function Dashboard() {
     if (!data || pdf === 'busy') return
     setPdf('busy')
     try {
-      const [{ exportReportPdf }, debts] = await Promise.all([import('../pdf/exportPdf'), loadDebts()])
+      // Borçlar alınamazsa (çevrimdışı, önbellek yok) rapor yine üretilir; borç bölümünde not çıkar.
+      const [{ exportReportPdf }, debts] = await Promise.all([import('../pdf/exportPdf'), loadDebts().catch(() => null)])
       await exportReportPdf(buildReport({ data, today, debts, pending: chat.outbox }))
       setPdf('idle')
     } catch (e) {

@@ -8,7 +8,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/tr'
 import type { ReactNode } from 'react'
 import { formatEur, formatShare, formatSignedEur } from '../lib/format'
-import type { BudgetReport } from '../lib/report'
+import { DEBTS_UNAVAILABLE_NOTE, type BudgetReport } from '../lib/report'
 import { PDF_FONT } from './fonts'
 import { PDF_COLORS as C } from './theme'
 
@@ -239,7 +239,9 @@ export function BudgetReportDocument({ report: r }: { report: BudgetReport }) {
 
         {/* 6. Borçlar */}
         <Section title="Borçlar (öncelik sırasıyla)" keepTogether={r.debts.rows.length < 12}>
-          {r.debts.rows.length === 0 ? (
+          {!r.debts.available ? (
+            <Text style={[s.note, s.italic]}>{DEBTS_UNAVAILABLE_NOTE}</Text>
+          ) : r.debts.rows.length === 0 ? (
             <Text style={s.note}>Kayıtlı borç yok.</Text>
           ) : (
             <View style={s.table}>

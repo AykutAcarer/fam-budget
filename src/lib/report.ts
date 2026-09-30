@@ -22,6 +22,8 @@ import { groupFixed, installmentBadgeText, installmentEndDate } from './fixed'
 import type { ExpenseLike } from './compare'
 
 export const REPORT_TITLE = 'Aile Bütçesi'
+/** Borç verisi alınamadığında (çevrimdışı, önbellek yok) Borçlar bölümünde gösterilen not. */
+export const DEBTS_UNAVAILABLE_NOTE = 'Borçlar çevrimdışı görüntülenemedi. Bağlantı gelince ya da Borçlar ekranı bir kez açıldıktan sonra rapora eklenir.'
 
 /** PDF fontunda emoji yok (kutu çıkar): piktogramlar ve varyasyon seçicileri atılır. */
 export function stripEmoji(text: string): string {
@@ -72,7 +74,8 @@ export interface BudgetReport {
   }
   /** Döngü henüz veritabanında yoksa null. */
   creditCard: CreditCardStatus | null
-  debts: { rows: { name: string; balance: number; priority: number }[]; total: number }
+  /** available=false: borç verisi alınamadı (liste boş, raporda not gösterilir). */
+  debts: { available: boolean; rows: { name: string; balance: number; priority: number }[]; total: number }
   fixed: {
     duzenli: ReportFixedRow[]
     duzenliTotal: number
@@ -84,7 +87,8 @@ export interface BudgetReport {
 export function buildReport(params: {
   data: BudgetData
   today: string
-  debts: readonly DebtRow[]
+  /** Borçlar; alınamadıysa (çevrimdışı ve önbellek yok) null/undefined — rapor yine üretilir. */
+  debts: readonly DebtRow[] | null | undefined
   /** Cihazda bekleyen harcamalar (ana ekrandaki gibi hesaba katılır). */
   pending?: readonly ExpenseLike[]
   /** Oluşturulma anı (test için sabitlenebilir). */
@@ -112,7 +116,7 @@ export function buildReport(params: {
     date: r.date,
     paid: r.paid,
   })
-  const sorted = sortDebts(debts)
+  const sorted = sortDebts(debts ?? [])
 
   return {
     title: REPORT_TITLE,
@@ -137,6 +141,7 @@ export function buildReport(params: {
     },
     creditCard: cycle ? creditCardStatus(Number(cycle.cc_opening_balance ?? 0), summary.creditCard) : null,
     debts: {
+      available: Array.isArray(debts),
       rows: sorted.map((d) => ({ name: stripEmoji(d.name), balance: d.balance, priority: d.priority })),
       total: debtTotals(sorted).total,
     },
