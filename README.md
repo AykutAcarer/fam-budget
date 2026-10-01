@@ -184,7 +184,8 @@ Ana ekrandaki **PDF indir** bulunulan döngünün raporunu üretip indirir (`ail
 - **Font:** Türkçe harfler için Roboto (normal, kalın, italik) `src/pdf/fonts/` altında, SIL OFL 1.1 (`OFL.txt`). Pakete data
   URL olarak gömülür: çalışma anında ağ isteği yok. Emoji kullanılmaz (metinlerden de temizlenir).
 - **Çevrimdışı:** react-pdf parçası (~1,9 MB) tembel yüklenir ve service worker precache'indedir
-  (`maximumFileSizeToCacheInBytes` 4 MiB). Borçlar verisi çevrimdışıyken son görülen önbellekten gelir.
+  (`maximumFileSizeToCacheInBytes` 4 MiB). Borçlar verisi çevrimdışıyken son görülen önbellekten gelir; o da yoksa
+  rapor yine üretilir, yalnız Borçlar bölümünde "Borçlar çevrimdışı görüntülenemedi" notu çıkar (export hiç çökmez).
 - Testler: `src/pdf/report.test.tsx` (rapor sayıları = seçiciler; Node'da gerçek PDF üretimi, Roboto gömülü, Helvetica yok).
 
 ## Çevrimdışı veri gösterimi
