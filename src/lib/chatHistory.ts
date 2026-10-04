@@ -165,3 +165,24 @@ export async function syncChatQueue(
   )
   return queue.length
 }
+
+// ---------------------------------------------------------------------------
+// Katlanmış görünüm
+// ---------------------------------------------------------------------------
+
+/**
+ * Sohbeti "eski" ve "son alışveriş" diye ikiye böler: son alışveriş, son
+ * kullanıcı mesajı ve ondan sonra gelen cevap(lar)dır. Kullanıcı mesajı yoksa
+ * yalnız son mesaj. Katlı görünümde eskiler gizlenir (veri değişmez).
+ */
+export function splitRecent<T extends Pick<ChatMessage, 'role'>>(messages: readonly T[]): { older: T[]; recent: T[] } {
+  let start = messages.length - 1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      start = i
+      break
+    }
+  }
+  start = Math.max(0, start)
+  return { older: messages.slice(0, start), recent: messages.slice(start) }
+}

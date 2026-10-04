@@ -9,6 +9,7 @@ import {
   migrateLegacyHistory,
   nextAt,
   readChatQueue,
+  splitRecent,
   syncChatQueue,
   toRow,
   type BotMessage,
@@ -143,5 +144,41 @@ describe('çevrimdışı kuyruk', () => {
     const store = memStore()
     store.setItem(chatQueueKey(U), '{bozuk')
     expect(readChatQueue(store, U)).toEqual([])
+  })
+})
+
+describe('katlanmış görünüm (son alışveriş)', () => {
+  const ids = (list: readonly ChatMessage[]) => list.map((m) => m.id)
+
+  it('boş ve tek çift: gizlenecek eski mesaj yok', () => {
+    expect(splitRecent([])).toEqual({ older: [], recent: [] })
+    const one = [user('u1', 1), bot('b1', 2)]
+    expect(ids(splitRecent(one).older)).toEqual([])
+    expect(ids(splitRecent(one).recent)).toEqual(['u1', 'b1'])
+  })
+
+  it('son kullanıcı mesajı ve cevapları görünür, öncekiler gizli', () => {
+    const list = [user('u1', 1), bot('b1', 2), user('u2', 3), bot('b2', 4), user('u3', 5), bot('b3', 6)]
+    const { older, recent } = splitRecent(list)
+    expect(ids(older)).toEqual(['u1', 'b1', 'u2', 'b2'])
+    expect(ids(recent)).toEqual(['u3', 'b3'])
+  })
+
+  it('son mesaja birden çok cevap geldiyse hepsi görünür', () => {
+    const { older, recent } = splitRecent([user('u1', 1), bot('b1', 2), user('u2', 3), bot('b2', 4), bot('b3', 5)])
+    expect(ids(older)).toEqual(['u1', 'b1'])
+    expect(ids(recent)).toEqual(['u2', 'b2', 'b3'])
+  })
+
+  it('yeni gönderilen, henüz cevapsız mesaj tek başına son alışveriştir', () => {
+    const { older, recent } = splitRecent([user('u1', 1), bot('b1', 2), user('u2', 3)])
+    expect(ids(older)).toEqual(['u1', 'b1'])
+    expect(ids(recent)).toEqual(['u2'])
+  })
+
+  it('kullanıcı mesajı yoksa yalnız son mesaj görünür', () => {
+    const { older, recent } = splitRecent([bot('b1', 1), bot('b2', 2)])
+    expect(ids(older)).toEqual(['b1'])
+    expect(ids(recent)).toEqual(['b2'])
   })
 })
